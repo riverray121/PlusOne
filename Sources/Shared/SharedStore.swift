@@ -1,0 +1,130 @@
+import Foundation
+import FamilyControls
+
+// App Group backed state shared by the app and extensions. Every process
+// reads and writes through this type; nothing else touches the suite.
+struct SharedStore {
+    static let shared = SharedStore()
+
+    private let defaults = UserDefaults(suiteName: AppGroup.suite)!
+    private let encoder = JSONEncoder()
+    private let decoder = JSONDecoder()
+
+    private enum Key {
+        static let selection = "selection"
+        static let protectionEnabled = "protectionEnabled"
+        static let durationMinutes = "durationMinutes"
+        static let cooldownMinutes = "cooldownMinutes"
+        static let dailyCap = "dailyCap"
+        static let pendingUnlock = "pendingUnlock"
+        static let activeSession = "activeSession"
+        static let sessionsToday = "sessionsToday"
+        static let sessionsDay = "sessionsDay"
+        static let lastSessionEnd = "lastSessionEnd"
+    }
+
+    // MARK: Selection
+
+    var selection: FamilyActivitySelection {
+        get {
+            guard let data = defaults.data(forKey: Key.selection),
+                  let value = try? decoder.decode(FamilyActivitySelection.self, from: data)
+            else { return FamilyActivitySelection() }
+            return value
+        }
+        nonmutating set {
+            defaults.set(try? encoder.encode(newValue), forKey: Key.selection)
+        }
+    }
+
+    var protectionEnabled: Bool {
+        get { defaults.bool(forKey: Key.protectionEnabled) }
+        nonmutating set { defaults.set(newValue, forKey: Key.protectionEnabled) }
+    }
+
+    // MARK: Settings
+
+    // Minutes of usage granted per pass.
+    var durationMinutes: Int {
+        get { max(1, defaults.object(forKey: Key.durationMinutes) as? Int ?? 5) }
+        nonmutating set { defaults.set(newValue, forKey: Key.durationMinutes) }
+    }
+
+    // Minutes required between sessions. 0 = off.
+    var cooldownMinutes: Int {
+        get { defaults.integer(forKey: Key.cooldownMinutes) }
+        nonmutating set { defaults.set(newValue, forKey: Key.cooldownMinutes) }
+    }
+
+    // Max sessions per calendar day. 0 = off.
+    var dailyCap: Int {
+        get { defaults.integer(forKey: Key.dailyCap) }
+        nonmutating set { defaults.set(newValue, forKey: Key.dailyCap) }
+    }
+
+    // MARK: Unlock flow state
+
+    // Written by the shield action extension; consumed by the app's capture flow.
+    var pendingUnlock: UnlockTarget? {
+        get {
+            guard let data = defaults.data(forKey: Key.pendingUnlock) else { return nil }
+            return try? decoder.decode(UnlockTarget.self, from: data)
+        }
+        nonmutating set {
+            if let newValue {
+                defaults.set(try? encoder.encode(newValue), forKey: Key.pendingUnlock)
+            } else {
+                defaults.removeObject(forKey: Key.pendingUnlock)
+            }
+        }
+    }
+
+    var activeSession: UnlockSession? {
+        get {
+            guard let data = defaults.data(forKey: Key.activeSession) else { return nil }
+            return try? decoder.decode(UnlockSession.self, from: data)
+        }
+        nonmutating set {
+            if let newValue {
+                defaults.set(try? encoder.encode(newValue), forKey: Key.activeSession)
+            } else {
+                defaults.removeObject(forKey: Key.activeSession)
+            }
+        }
+    }
+
+    var lastSessionEnd: Date? {
+        get { defaults.object(forKey: Key.lastSessionEnd) as? Date }
+        nonmutating set { defaults.set(newValue, forKey: Key.lastSessionEnd) }
+    }
+
+    // MARK: Daily counter
+
+    // Session count is scoped to a day string so it resets at midnight without
+    // needing a scheduled job.
+    func sessionsToday(now: Date = Date()) -> Int {
+        guard defaults.string(forKey: Key.sessionsDay) == Self.dayString(now) else { return 0 }
+        return defaults.integer(forKey: Key.sessionsToday)
+    }
+
+    func incrementSessionsToday(now: Date = Date()) {
+        let day = Self.dayString(now)
+        let count = defaults.string(forKey: Key.sessionsDay) == day ? defaults.integer(forKey: Key.sessionsToday) : 0
+        defaults.set(day, forKey: Key.sessionsDay)
+        defaults.set(count + 1, forKey: Key.sessionsToday)
+    }
+
+    private static func dayString(_ date: Date) -> String {
+        let c = Calendar.current.dateComponents([.year, .month, .day], from: date)
+        return "\(c.year!)-\(c.month!)-\(c.day!)"
+    }
+}
+
+// A granted unlock window. wallClockEnd is a backstop; the primary limit is
+// usage-based and enforced by DeviceActivity.
+struct UnlockSession: Codable {
+    let target: UnlockTarget
+    let startedAt: Date
+    let usageMinutes: Int
+    let wallClockEnd: Date
+}
