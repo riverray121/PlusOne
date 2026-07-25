@@ -19,7 +19,7 @@ Only the ACTIVE milestone is current; ignore shipped ones unless asked.
 ## Commands
 - Generate project: `xcodegen generate`
 - Build: `xcodebuild -project PlusOne.xcodeproj -scheme PlusOne -destination 'generic/platform=iOS' build`
-- Test: `xcodebuild -project PlusOne.xcodeproj -scheme PlusOne -destination 'platform=iOS Simulator,name=iPhone 17' test`
+- Build (sim): `xcodebuild -project PlusOne.xcodeproj -scheme PlusOne -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.5' build`
 - Run: from Xcode, on a physical iPhone (Screen Time APIs do not work in the simulator)
 
 ## Git

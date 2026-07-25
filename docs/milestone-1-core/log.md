@@ -3,14 +3,19 @@
 Development context for resuming work. Keep entries to one line. Not a changelog.
 
 ## Completed
+- Slice 1: four-target XcodeGen project; all targets build for simulator.
+- Slice 2: authorization flow, FamilyActivityPicker, protection toggle, ShieldController.
+- Slice 3: Capture screen with FaceCheck (Vision, 2 faces at min height, 1.5 s hold).
+- Slice 4: shield extensions, notification hop, per-item unlock, DeviceActivity re-lock.
+- Slice 5: Settings with duration/cooldown/daily cap; gates enforced in SessionManager.
+- Slice 6: onboarding, README with sim screenshots.
 
 ## Todo
-- [ ] Slice 1: Project scaffold
-- [ ] Slice 2: Block and unblock
-- [ ] Slice 3: Live two-face check
-- [ ] Slice 4: Unlock loop
-- [ ] Slice 5: Session rules
-- [ ] Slice 6: Presentation
+- [ ] On-device verification of all Screen Time paths (shield, unlock hop, re-lock).
 
 ## Notes
+- DeviceActivity rejects schedules under 15 minutes, so the session limit is a usage threshold event (true "minutes of use"); interval end at max(15, duration+1) min and a foreground expiry check are backstops.
+- Extension targets are named *Extension to avoid colliding with ManagedSettings type names (ShieldAction).
+- Extension bundle IDs must be prefixed by the app's bundle ID; set explicitly in project.yml.
+- Simulator: Screen Time auth is stubbed via targetEnvironment(simulator); Capture shows a sim-only "Simulate two-face pass" button.
 - Development-signed builds need only the Xcode Family Controls capability; the distribution entitlement (TestFlight/App Store) must be requested from Apple and is not yet requested.
