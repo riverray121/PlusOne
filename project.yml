@@ -1,0 +1,121 @@
+name: PlusOne
+options:
+  bundleIdPrefix: com.riverray
+  deploymentTarget:
+    iOS: "16.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    # Personal project: automatic signing; team is selected in Xcode on first device run.
+    CODE_SIGN_STYLE: Automatic
+    CURRENT_PROJECT_VERSION: 1
+    MARKETING_VERSION: 0.1.0
+
+targets:
+  PlusOne:
+    type: application
+    platform: iOS
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.riverray.PlusOne
+    sources:
+      - Sources/App
+      - Sources/Shared
+    entitlements:
+      path: Entitlements/PlusOne.entitlements
+      properties:
+        com.apple.developer.family-controls: true
+        com.apple.security.application-groups:
+          - group.com.riverray.plusone
+    info:
+      path: Info/PlusOne-Info.plist
+      properties:
+        CFBundleDisplayName: PlusOne
+        UILaunchScreen: {}
+        NSCameraUsageDescription: "The camera verifies two people are present before unlocking a blocked app. Frames are analyzed on-device and never stored."
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+    dependencies:
+      - target: ShieldUIExtension
+      - target: ShieldActionExtension
+      - target: MonitorExtension
+
+  ShieldUIExtension:
+    type: app-extension
+    platform: iOS
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.riverray.PlusOne.ShieldUIExtension
+    sources:
+      - Sources/ShieldUI
+      - Sources/Shared
+    entitlements:
+      path: Entitlements/ShieldUIExtension.entitlements
+      properties:
+        com.apple.developer.family-controls: true
+        com.apple.security.application-groups:
+          - group.com.riverray.plusone
+    info:
+      path: Info/ShieldUIExtension-Info.plist
+      properties:
+        CFBundleDisplayName: PlusOne Shield
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.ManagedSettingsUI.shield-configuration-service
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShieldConfigurationProvider
+
+  ShieldActionExtension:
+    type: app-extension
+    platform: iOS
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.riverray.PlusOne.ShieldActionExtension
+    sources:
+      - Sources/ShieldAction
+      - Sources/Shared
+    entitlements:
+      path: Entitlements/ShieldActionExtension.entitlements
+      properties:
+        com.apple.developer.family-controls: true
+        com.apple.security.application-groups:
+          - group.com.riverray.plusone
+    info:
+      path: Info/ShieldActionExtension-Info.plist
+      properties:
+        CFBundleDisplayName: PlusOne Shield Action
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.ManagedSettings.shield-action-service
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShieldActionProvider
+
+  MonitorExtension:
+    type: app-extension
+    platform: iOS
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.riverray.PlusOne.MonitorExtension
+    sources:
+      - Sources/Monitor
+      - Sources/Shared
+    entitlements:
+      path: Entitlements/MonitorExtension.entitlements
+      properties:
+        com.apple.developer.family-controls: true
+        com.apple.security.application-groups:
+          - group.com.riverray.plusone
+    info:
+      path: Info/MonitorExtension-Info.plist
+      properties:
+        CFBundleDisplayName: PlusOne Monitor
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.deviceactivity.monitor-extension
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).SessionMonitor
+
+schemes:
+  PlusOne:
+    build:
+      targets:
+        PlusOne: all
+    run:
+      config: Debug
+    archive:
+      config: Release
