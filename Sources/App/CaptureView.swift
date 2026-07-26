@@ -106,6 +106,19 @@ struct CaptureView: View {
                 Text("Get both faces close to the camera and hold still.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
+
+                if faceCheck.depthActive {
+                    Label("Depth check on: faces on photos or screens don't count.", systemImage: "cube.transparent")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                #if DEBUG
+                if !faceCheck.debugDepthInfo.isEmpty {
+                    Text("depth spread: \(faceCheck.debugDepthInfo)")
+                        .font(.caption2.monospaced())
+                        .foregroundStyle(.tertiary)
+                }
+                #endif
             }
             .padding(.horizontal)
 
