@@ -17,7 +17,7 @@ struct SharedStore {
         static let cooldownMinutes = "cooldownMinutes"
         static let dailyCap = "dailyCap"
         static let pendingUnlock = "pendingUnlock"
-        static let activeSession = "activeSession"
+        static let activeSessions = "activeSessions"
         static let sessionsToday = "sessionsToday"
         static let sessionsDay = "sessionsDay"
         static let lastSessionEnd = "lastSessionEnd"
@@ -79,17 +79,14 @@ struct SharedStore {
         }
     }
 
-    var activeSession: UnlockSession? {
+    // Concurrent sessions: one per unlocked item, each with its own timer.
+    var activeSessions: [UnlockSession] {
         get {
-            guard let data = defaults.data(forKey: Key.activeSession) else { return nil }
-            return try? decoder.decode(UnlockSession.self, from: data)
+            guard let data = defaults.data(forKey: Key.activeSessions) else { return [] }
+            return (try? decoder.decode([UnlockSession].self, from: data)) ?? []
         }
         nonmutating set {
-            if let newValue {
-                defaults.set(try? encoder.encode(newValue), forKey: Key.activeSession)
-            } else {
-                defaults.removeObject(forKey: Key.activeSession)
-            }
+            defaults.set(try? encoder.encode(newValue), forKey: Key.activeSessions)
         }
     }
 
@@ -121,8 +118,10 @@ struct SharedStore {
 }
 
 // A granted unlock window. wallClockEnd is a backstop; the primary limit is
-// usage-based and enforced by DeviceActivity.
+// usage-based and enforced by DeviceActivity. `id` names this session's
+// DeviceActivity so concurrent sessions end independently.
 struct UnlockSession: Codable {
+    let id: String
     let target: UnlockTarget
     let startedAt: Date
     let usageMinutes: Int

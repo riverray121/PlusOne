@@ -14,7 +14,8 @@ Development context for resuming work. Keep entries to one line. Not a changelog
 - [ ] On-device verification of all Screen Time paths (shield, unlock hop, re-lock).
 
 ## Notes
-- Depth liveness: on TrueDepth devices each counted face must have >= 8mm depth std dev over its central region (FaceCheck.minDepthStdDev); rejects faces on photos/screens. Threshold needs on-device tuning; DEBUG builds show per-face spread in Capture.
+- Depth liveness: on TrueDepth devices each counted face must deviate >= 4mm RMS from its best-fit plane (FaceCheck.minDepthResidual). Plane fit, not std dev: a tilted screen has depth spread but stays planar. Threshold needs on-device tuning; DEBUG builds show per-face residual in Capture.
+- Sessions are concurrent (one per item, DeviceActivity name "unlockSession-<uuid>"); gateCheck only refuses a target that is already unlocked.
 - Free Personal Teams do not support Family Controls at all; paid membership renewal in progress. Device registration list is also full until membership is active.
 - PlusOneLite target (temporary): entitlement-free, runs on free team and on Mac; remove after device testing.
 - DeviceActivity rejects schedules under 15 minutes, so the session limit is a usage threshold event (true "minutes of use"); interval end at max(15, duration+1) min and a foreground expiry check are backstops.

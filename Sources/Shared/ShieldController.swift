@@ -9,9 +9,9 @@ struct ShieldController {
 
     private let store = ManagedSettingsStore(named: .init(AppGroup.managedSettingsStoreName))
 
-    // Shields the full selection, minus an optionally excluded (unlocked) item.
+    // Shields the full selection, minus excluded (unlocked) items.
     // Category-shielded items are excluded via the policy's `except` sets.
-    func applyShields(excluding excluded: UnlockTarget? = nil) {
+    func applyShields(excluding excluded: [UnlockTarget] = []) {
         let selection = SharedStore.shared.selection
 
         var apps = selection.applicationTokens
@@ -20,17 +20,17 @@ struct ShieldController {
         var exceptApps: Set<ApplicationToken> = []
         var exceptDomains: Set<WebDomainToken> = []
 
-        switch excluded {
-        case .application(let token):
-            apps.remove(token)
-            exceptApps.insert(token)
-        case .webDomain(let token):
-            domains.remove(token)
-            exceptDomains.insert(token)
-        case .category(let token):
-            categories.remove(token)
-        case nil:
-            break
+        for target in excluded {
+            switch target {
+            case .application(let token):
+                apps.remove(token)
+                exceptApps.insert(token)
+            case .webDomain(let token):
+                domains.remove(token)
+                exceptDomains.insert(token)
+            case .category(let token):
+                categories.remove(token)
+            }
         }
 
         store.shield.applications = apps.isEmpty ? nil : apps

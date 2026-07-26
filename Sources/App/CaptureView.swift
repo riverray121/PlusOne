@@ -51,20 +51,24 @@ struct CaptureView: View {
             .navigationTitle("Unlock")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        appState.clearPendingUnlock()
-                        dismiss()
+                if !granted {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") {
+                            appState.clearPendingUnlock()
+                            dismiss()
+                        }
                     }
                 }
             }
         }
         .interactiveDismissDisabled(false)
         .onAppear {
+            // Sheets can be re-presented with stale state from a prior grant.
+            granted = false
             #if LITE
             faceCheck.start()
             #else
-            gate = SessionManager.shared.gateCheck()
+            gate = SessionManager.shared.gateCheck(for: appState.pendingUnlock)
             if gate == .allowed { faceCheck.start() }
             #endif
         }
@@ -114,7 +118,7 @@ struct CaptureView: View {
                 }
                 #if DEBUG
                 if !faceCheck.debugDepthInfo.isEmpty {
-                    Text("depth spread: \(faceCheck.debugDepthInfo)")
+                    Text("depth residual: \(faceCheck.debugDepthInfo)")
                         .font(.caption2.monospaced())
                         .foregroundStyle(.tertiary)
                 }
@@ -138,27 +142,36 @@ struct CaptureView: View {
     }
 
     private var grantedView: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 20) {
+            Spacer()
             Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 64))
+                .font(.system(size: 72))
                 .foregroundStyle(.green)
             #if LITE
             Text("Check passed")
-                .font(.title2.bold())
+                .font(.largeTitle.bold())
             Text("Two people detected. In the full build this unlocks the blocked app.")
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
             #else
-            Text("Unlocked for \(SharedStore.shared.durationMinutes) minutes")
-                .font(.title2.bold())
-            Text("Reopen the app you were trying to use. It re-locks automatically.")
+            Text("You're in")
+                .font(.largeTitle.bold())
+            Text("Return to your app. It's unlocked for \(SharedStore.shared.durationMinutes) minutes of use, then locks itself.")
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
             #endif
-            Button("Done") { dismiss() }
-                .buttonStyle(.borderedProminent)
+            Spacer()
+            Button {
+                dismiss()
+            } label: {
+                Text("Done")
+                    .font(.headline)
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
         }
-        .padding()
+        .padding(24)
     }
 
     private var noPendingView: some View {

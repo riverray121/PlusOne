@@ -49,9 +49,10 @@ W1691124427) is active. Family Controls does not work on free Personal Teams.
 
 ## Test 4: Selfie check
 The capture screen should show "Depth check on" (TrueDepth active) and, in
-debug builds, a live "depth spread" readout per face. Real faces read roughly
-15mm and up; screens/photos read near 0 to 5mm. Threshold is 8mm
-(`FaceCheck.minDepthStdDev`); note readings that land on the wrong side.
+debug builds, a live "depth residual" readout per face: RMS deviation from the
+face region's best-fit plane, so flat surfaces read low at any tilt. Real
+faces read roughly 6mm and up; screens/photos read 0 to 2mm. Threshold is 4mm
+(`FaceCheck.minDepthResidual`); note readings that land on the wrong side.
 
 1. Point the camera at yourself only. Hold 3+ seconds.
 - Pass: counter stays at "1 of 2," progress never completes.

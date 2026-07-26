@@ -15,7 +15,7 @@ struct PlusOneApp: App {
                     // Foreground pass: expire lapsed sessions and surface any
                     // unlock request written by the shield action extension.
                     if phase == .active {
-                        SessionManager.shared.endSessionIfExpired()
+                        SessionManager.shared.endExpiredSessions()
                         appState.refresh()
                         if appState.pendingUnlock != nil {
                             appState.showCapture = true

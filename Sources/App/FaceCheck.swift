@@ -13,9 +13,10 @@ final class FaceCheck: NSObject, ObservableObject {
     // background face or a photo held at a distance.
     static let minFaceHeight: CGFloat = 0.12
     static let holdDuration: TimeInterval = 1.5
-    // Minimum depth spread (meters) across a face region for it to count as a
-    // real 3D face. Screens and photos are flat: spread near sensor noise.
-    static let minDepthStdDev: Float = 0.008
+    // Minimum RMS deviation (meters) of a face region from its best-fit
+    // plane. A tilted screen has depth spread but is still planar; a real
+    // face has a nose. Screens and photos land near sensor noise.
+    static let minDepthResidual: Float = 0.004
 
     @Published var validFaceCount = 0
     @Published var progress: Double = 0
@@ -129,9 +130,9 @@ final class FaceCheck: NSObject, ObservableObject {
         var spreads: [Float] = []
         let valid = bigEnough.filter { face in
             guard let depth else { return true }
-            let spread = Self.depthStdDev(in: face.boundingBox, depth: depth)
-            spreads.append(spread)
-            return spread >= Self.minDepthStdDev
+            let residual = Self.depthPlaneResidual(in: face.boundingBox, depth: depth)
+            spreads.append(residual)
+            return residual >= Self.minDepthResidual
         }
         let qualifies = valid.count >= Self.requiredFaces
 
@@ -157,10 +158,11 @@ final class FaceCheck: NSObject, ObservableObject {
         }
     }
 
-    // Standard deviation of depth (meters) over the central part of a face
-    // rect. Vision rects are normalized with a bottom-left origin; the depth
-    // map shares the video stream's portrait orientation.
-    private static func depthStdDev(in boundingBox: CGRect, depth: CVPixelBuffer) -> Float {
+    // RMS deviation (meters) of the central face region from its best-fit
+    // plane. Distinguishes a 3D face from any flat surface at any tilt.
+    // Vision rects are normalized with a bottom-left origin; the depth map
+    // shares the video stream's portrait orientation.
+    private static func depthPlaneResidual(in boundingBox: CGRect, depth: CVPixelBuffer) -> Float {
         CVPixelBufferLockBaseAddress(depth, .readOnly)
         defer { CVPixelBufferUnlockBaseAddress(depth, .readOnly) }
 
@@ -183,8 +185,8 @@ final class FaceCheck: NSObject, ObservableObject {
         let y1 = min(height - 1, Int((1 - inset.minY) * CGFloat(height)))
         guard x1 > x0, y1 > y0 else { return 0 }
 
-        // 8x8 sample grid is plenty to distinguish a face from a plane.
-        var values: [Float] = []
+        // 9x9 sample grid: (x, y, depth) triples for the plane fit.
+        var samples: [(x: Float, y: Float, z: Float)] = []
         let steps = 8
         for iy in 0...steps {
             let y = y0 + (y1 - y0) * iy / steps
@@ -204,14 +206,43 @@ final class FaceCheck: NSObject, ObservableObject {
                 if format == kCVPixelFormatType_DisparityFloat32 || format == kCVPixelFormatType_DisparityFloat16 {
                     v = v > 0 ? 1 / v : .nan
                 }
-                if v.isFinite { values.append(v) }
+                if v.isFinite {
+                    samples.append((Float(ix) / Float(steps), Float(iy) / Float(steps), v))
+                }
             }
         }
-        guard values.count > 8 else { return 0 }
+        guard samples.count > 8 else { return 0 }
 
-        let mean = values.reduce(0, +) / Float(values.count)
-        let variance = values.reduce(0) { $0 + ($1 - mean) * ($1 - mean) } / Float(values.count)
-        return variance.squareRoot()
+        // Least-squares plane z = a*x + b*y + c via the 3x3 normal equations.
+        let n = Float(samples.count)
+        var sx: Float = 0, sy: Float = 0, sz: Float = 0
+        var sxx: Float = 0, syy: Float = 0, sxy: Float = 0
+        var sxz: Float = 0, syz: Float = 0
+        for s in samples {
+            sx += s.x; sy += s.y; sz += s.z
+            sxx += s.x * s.x; syy += s.y * s.y; sxy += s.x * s.y
+            sxz += s.x * s.z; syz += s.y * s.z
+        }
+        let det = sxx * (syy * n - sy * sy)
+            - sxy * (sxy * n - sy * sx)
+            + sx * (sxy * sy - syy * sx)
+        guard abs(det) > .ulpOfOne else { return 0 }
+        let a = (sxz * (syy * n - sy * sy)
+            - sxy * (syz * n - sy * sz)
+            + sx * (syz * sy - syy * sz)) / det
+        let b = (sxx * (syz * n - sy * sz)
+            - sxz * (sxy * n - sx * sy)
+            + sx * (sxy * sz - syz * sx)) / det
+        let c = (sxx * (syy * sz - syz * sy)
+            - sxy * (sxy * sz - syz * sx)
+            + sxz * (sxy * sy - syy * sx)) / det
+
+        // RMS of residuals from the fitted plane.
+        let sumSq = samples.reduce(Float(0)) {
+            let r = $1.z - (a * $1.x + b * $1.y + c)
+            return $0 + r * r
+        }
+        return (sumSq / n).squareRoot()
     }
 }
 

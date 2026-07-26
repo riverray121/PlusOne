@@ -61,9 +61,9 @@ struct HomeView: View {
             }
             .disabled(appState.blockedItemCount == 0)
 
-            if let session = appState.activeSession {
+            ForEach(appState.activeSessions, id: \.id) { session in
                 Label(
-                    "Session active: \(session.usageMinutes) min of \(session.target.displayNoun) usage granted",
+                    "Unlocked \(session.target.displayNoun): \(session.usageMinutes) min of usage",
                     systemImage: "lock.open.fill"
                 )
                 .foregroundStyle(.orange)

@@ -22,13 +22,13 @@ final class AppState: ObservableObject {
             if protectionEnabled {
                 ShieldController.shared.applyShields()
             } else {
-                SessionManager.shared.endSession()
+                SessionManager.shared.endAllSessions()
                 ShieldController.shared.clearShields()
             }
         }
     }
     @Published var pendingUnlock: UnlockTarget?
-    @Published var activeSession: UnlockSession?
+    @Published var activeSessions: [UnlockSession] = []
     @Published var showCapture = false
 
     init() {
@@ -36,13 +36,13 @@ final class AppState: ObservableObject {
         selection = store.selection
         protectionEnabled = store.protectionEnabled
         pendingUnlock = store.pendingUnlock
-        activeSession = store.activeSession
+        activeSessions = store.activeSessions
     }
 
     // Re-reads extension-written state (pending unlocks, ended sessions).
     func refresh() {
         pendingUnlock = store.pendingUnlock
-        activeSession = store.activeSession
+        activeSessions = store.activeSessions
     }
 
     func clearPendingUnlock() {
