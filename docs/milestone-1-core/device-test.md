@@ -5,16 +5,27 @@ passed. Prerequisite: a second person (or a co-conspirator photo, to prove the
 liveness check rejects it).
 
 ## Setup (one time)
-1. Open Xcode, sign in: Xcode > Settings > Accounts > add your Apple ID.
-2. In `PlusOne.xcodeproj`, select each of the 4 targets > Signing &
-   Capabilities > check "Automatically manage signing" and pick your personal
-   team. (If the Family Controls capability shows a signing error, add your
-   Apple ID's team first, then retry.)
-3. Plug in the iPhone, enable Developer Mode if prompted
-   (Settings > Privacy & Security > Developer Mode, requires restart).
-4. Select the iPhone as the run destination, press Run.
-5. First launch: trust the developer cert if prompted
-   (Settings > General > VPN & Device Management).
+Blocked until the Apple Developer Program renewal (ordered 2026-07-26, order
+W1691124427) is active. Family Controls does not work on free Personal Teams.
+
+1. Confirm activation: the "Welcome to the Apple Developer Program" email
+   arrived and https://developer.apple.com/account shows the membership as
+   active. If it still shows expired, stop; nothing below will work yet.
+2. Prune devices: https://developer.apple.com/account/resources/devices/list
+   is over its limit from the previous membership year. Remove stale devices
+   (or take the one-time reset offered at renewal) so the current iPhone can
+   register.
+3. In Xcode > Settings > Accounts, select the Apple ID and refresh (or remove
+   and re-add it) so the paid team appears alongside the Personal Team.
+4. In `PlusOne.xcodeproj`, select each of the 4 main targets (PlusOne,
+   ShieldUIExtension, ShieldActionExtension, MonitorExtension) > Signing &
+   Capabilities > pick the paid team (the one NOT labeled "Personal Team").
+   The Family Controls warning should clear. PlusOneLite can stay on the
+   Personal Team; it is temporary and gets deleted after device testing.
+5. Select the PlusOne scheme (not PlusOneLite), destination = the iPhone,
+   press Run. Trust the developer cert on the phone if prompted
+   (Settings > General > VPN & Device Management). Developer Mode is already
+   enabled from the lite-build session.
 
 ## Test 1: Onboarding
 1. Complete all three permission rows. Screen Time shows a system consent
@@ -37,11 +48,19 @@ liveness check rejects it).
   the camera screen should appear on its own.
 
 ## Test 4: Selfie check
+The capture screen should show "Depth check on" (TrueDepth active) and, in
+debug builds, a live "depth spread" readout per face. Real faces read roughly
+15mm and up; screens/photos read near 0 to 5mm. Threshold is 8mm
+(`FaceCheck.minDepthStdDev`); note readings that land on the wrong side.
+
 1. Point the camera at yourself only. Hold 3+ seconds.
 - Pass: counter stays at "1 of 2," progress never completes.
-2. Hold up a photo of a face next to yours, wave it.
-- Pass: brief flickers at most; sustained hold does not complete.
-3. With a second person in frame, hold still ~2 seconds.
+2. Hold a face photo on a phone screen next to yours, steady and close.
+- Pass: counter stays at "1 of 2"; the flat screen face is rejected by the
+  depth check even when held perfectly still.
+3. Same with a printed photo or a photo waved around.
+- Pass: no sustained "2 of 2."
+4. With a second person in frame, hold still ~2 seconds.
 - Pass: "Unlocked for 5 minutes" confirmation appears.
 
 ## Test 5: Session and re-lock
