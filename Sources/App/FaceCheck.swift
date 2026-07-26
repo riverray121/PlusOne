@@ -95,7 +95,11 @@ extension FaceCheck: AVCaptureVideoDataOutputSampleBufferDelegate {
             self.evaluate(faces: (request.results as? [VNFaceObservation]) ?? [])
             self.isProcessing = false
         }
-        let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: .leftMirrored)
+        // iPhone front camera delivers rotated portrait frames; a Mac's camera
+        // delivers upright landscape ones.
+        let orientation: CGImagePropertyOrientation =
+            ProcessInfo.processInfo.isiOSAppOnMac ? .upMirrored : .leftMirrored
+        let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: orientation)
         do {
             try handler.perform([request])
         } catch {
