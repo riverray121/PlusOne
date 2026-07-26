@@ -41,7 +41,10 @@ final class FaceCheck: NSObject, ObservableObject {
         guard !configured else { return }
         configured = true
 
-        guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front),
+        // Front camera on iPhone; any camera elsewhere (Mac, iPad rigs).
+        let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front)
+            ?? AVCaptureDevice.default(for: .video)
+        guard let device,
               let input = try? AVCaptureDeviceInput(device: device),
               session.canAddInput(input)
         else {
