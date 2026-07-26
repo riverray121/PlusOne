@@ -117,7 +117,7 @@ final class FaceCheck: NSObject, ObservableObject {
     // MARK: Shared pass/hold logic
 
     // validCount is the number of qualifying faces this frame.
-    private func updateHold(validCount: Int, residuals: [Float]) {
+    private func updateHold(validCount: Int) {
         let qualifies = validCount >= Self.requiredFaces
         let now = Date()
         if qualifies {
@@ -133,13 +133,23 @@ final class FaceCheck: NSObject, ObservableObject {
             self.validFaceCount = validCount
             self.progress = progress
             if passed && !self.passed { self.passed = true }
-            #if DEBUG
-            self.debugDepthInfo = residuals.isEmpty
-                ? ""
-                : residuals.map { String(format: "%.1fmm", $0 * 1000) }.joined(separator: "  ")
-            #endif
         }
     }
+
+    #if DEBUG
+    // Refreshed at most twice a second so the values can be read and
+    // screenshotted during threshold tuning.
+    private var lastDebugUpdate = Date.distantPast
+    private func updateDebug(_ lines: [String]) {
+        let now = Date()
+        guard now.timeIntervalSince(lastDebugUpdate) > 0.5 else { return }
+        lastDebugUpdate = now
+        let text = lines.enumerated()
+            .map { "face\($0.offset + 1): \($0.element)" }
+            .joined(separator: "\n")
+        DispatchQueue.main.async { self.debugDepthInfo = text }
+    }
+    #endif
 
     // MARK: Depth path evaluation
 
@@ -148,8 +158,10 @@ final class FaceCheck: NSObject, ObservableObject {
         let videoH = CGFloat(CVPixelBufferGetHeight(videoBuffer))
         guard videoW > 0, videoH > 0 else { return }
 
-        var residuals: [Float] = []
         var validCount = 0
+        #if DEBUG
+        var debugFaces: [String] = []
+        #endif
         for face in faces {
             // Metadata rect -> video-buffer pixel rect (Apple-provided
             // conversion), then normalized top-left-origin coordinates shared
@@ -166,12 +178,18 @@ final class FaceCheck: NSObject, ObservableObject {
             guard max(norm.width, norm.height) >= Self.minFaceExtent else { continue }
 
             let metrics = Self.depthMetrics(in: norm, depth: depth)
-            residuals.append(contentsOf: [metrics.residual, metrics.bump])
-            if metrics.residual >= Self.minDepthResidual, metrics.bump >= Self.minDepthBump {
-                validCount += 1
-            }
+            let solid = metrics.residual >= Self.minDepthResidual && metrics.bump >= Self.minDepthBump
+            if solid { validCount += 1 }
+            #if DEBUG
+            debugFaces.append(String(format: "%@ res %.1fmm bump %.1fmm",
+                                     solid ? "PASS" : "FAIL",
+                                     metrics.residual * 1000, metrics.bump * 1000))
+            #endif
         }
-        updateHold(validCount: validCount, residuals: residuals)
+        updateHold(validCount: validCount)
+        #if DEBUG
+        updateDebug(debugFaces)
+        #endif
     }
 
     // MARK: 2D path evaluation
@@ -184,7 +202,7 @@ final class FaceCheck: NSObject, ObservableObject {
             guard let self else { return }
             let faces = (request.results as? [VNFaceObservation]) ?? []
             let valid = faces.filter { $0.boundingBox.height >= Self.minFaceExtent }
-            self.updateHold(validCount: valid.count, residuals: [])
+            self.updateHold(validCount: valid.count)
             self.isProcessing = false
         }
         let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: orientation)

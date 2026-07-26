@@ -96,9 +96,10 @@ struct CaptureView: View {
                 }
                 #if DEBUG
                 if !faceCheck.debugDepthInfo.isEmpty {
-                    Text("depth residual: \(faceCheck.debugDepthInfo)")
-                        .font(.caption2.monospaced())
-                        .foregroundStyle(.tertiary)
+                    Text(faceCheck.debugDepthInfo)
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
                 }
                 #endif
             }
