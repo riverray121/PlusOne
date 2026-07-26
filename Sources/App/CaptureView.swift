@@ -14,6 +14,14 @@ struct CaptureView: View {
     var body: some View {
         NavigationStack {
             Group {
+                #if LITE
+                // Lite build: no pending target or gates; camera check only.
+                if granted {
+                    grantedView
+                } else {
+                    cameraView
+                }
+                #else
                 if appState.pendingUnlock == nil {
                     noPendingView
                 } else if granted {
@@ -38,6 +46,7 @@ struct CaptureView: View {
                     )
                     }
                 }
+                #endif
             }
             .navigationTitle("Unlock")
             .navigationBarTitleDisplayMode(.inline)
@@ -52,8 +61,12 @@ struct CaptureView: View {
         }
         .interactiveDismissDisabled(false)
         .onAppear {
+            #if LITE
+            faceCheck.start()
+            #else
             gate = SessionManager.shared.gateCheck()
             if gate == .allowed { faceCheck.start() }
+            #endif
         }
         .onDisappear { faceCheck.stop() }
         .onChange(of: faceCheck.passed) { passed in
@@ -116,11 +129,19 @@ struct CaptureView: View {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 64))
                 .foregroundStyle(.green)
+            #if LITE
+            Text("Check passed")
+                .font(.title2.bold())
+            Text("Two people detected. In the full build this unlocks the blocked app.")
+                .multilineTextAlignment(.center)
+                .foregroundStyle(.secondary)
+            #else
             Text("Unlocked for \(SharedStore.shared.durationMinutes) minutes")
                 .font(.title2.bold())
             Text("Reopen the app you were trying to use. It re-locks automatically.")
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
+            #endif
             Button("Done") { dismiss() }
                 .buttonStyle(.borderedProminent)
         }
@@ -151,8 +172,11 @@ struct CaptureView: View {
     // MARK: Grant
 
     private func grant() {
-        guard let target = appState.pendingUnlock else { return }
         faceCheck.stop()
+        #if LITE
+        granted = true
+        #else
+        guard let target = appState.pendingUnlock else { return }
         do {
             try SessionManager.shared.startSession(for: target)
             appState.refresh()
@@ -160,6 +184,7 @@ struct CaptureView: View {
         } catch {
             grantError = true
         }
+        #endif
     }
 
     private static func minutesUp(_ seconds: TimeInterval) -> Int {

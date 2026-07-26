@@ -9,11 +9,15 @@ struct HomeView: View {
     var body: some View {
         NavigationStack {
             List {
+                #if LITE
+                liteSection
+                #else
                 statusSection
                 if appState.pendingUnlock != nil {
                     pendingSection
                 }
                 blockedListSection
+                #endif
             }
             .navigationTitle("PlusOne")
             .toolbar {
@@ -29,6 +33,22 @@ struct HomeView: View {
             .familyActivityPicker(isPresented: $showPicker, selection: $appState.selection)
         }
     }
+
+    #if LITE
+    // Lite build: blocking is unavailable; the camera check is tested directly.
+    private var liteSection: some View {
+        Section {
+            Button {
+                appState.showCapture = true
+            } label: {
+                Label("Test the selfie check", systemImage: "camera.fill")
+                    .font(.headline)
+            }
+        } footer: {
+            Text("Lite build: blocking is disabled. This runs the two-face camera check only.")
+        }
+    }
+    #endif
 
     private var statusSection: some View {
         Section {

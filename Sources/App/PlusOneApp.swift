@@ -35,11 +35,16 @@ struct RootView: View {
 
     var body: some View {
         Group {
+            #if LITE
+            // Lite build: no Screen Time, so onboarding has nothing to set up.
+            HomeView()
+            #else
             if appState.onboarded {
                 HomeView()
             } else {
                 OnboardingView()
             }
+            #endif
         }
         .sheet(isPresented: $appState.showCapture) {
             CaptureView()

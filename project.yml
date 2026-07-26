@@ -41,6 +41,27 @@ targets:
       - target: ShieldActionExtension
       - target: MonitorExtension
 
+  # Temporary: entitlement-free build for camera testing on a free Personal
+  # Team. No Screen Time, no App Group, no extensions. Remove once the paid
+  # membership is active.
+  PlusOneLite:
+    type: application
+    platform: iOS
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.riverray.PlusOneLite
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: "LITE $(inherited)"
+    sources:
+      - Sources/App
+      - Sources/Shared
+    info:
+      path: Info/PlusOneLite-Info.plist
+      properties:
+        CFBundleDisplayName: PlusOne Lite
+        UILaunchScreen: {}
+        NSCameraUsageDescription: "The camera verifies two people are present before unlocking a blocked app. Frames are analyzed on-device and never stored."
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+
   ShieldUIExtension:
     type: app-extension
     platform: iOS
@@ -119,3 +140,9 @@ schemes:
       config: Debug
     archive:
       config: Release
+  PlusOneLite:
+    build:
+      targets:
+        PlusOneLite: all
+    run:
+      config: Debug
