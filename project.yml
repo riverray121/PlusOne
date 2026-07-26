@@ -70,9 +70,11 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.riverray.PlusOne.ShieldUIExtension
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     sources:
       - Sources/ShieldUI
       - Sources/Shared
+      - Resources
     entitlements:
       path: Entitlements/ShieldUIExtension.entitlements
       properties:
@@ -93,9 +95,11 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.riverray.PlusOne.ShieldActionExtension
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     sources:
       - Sources/ShieldAction
       - Sources/Shared
+      - Resources
     entitlements:
       path: Entitlements/ShieldActionExtension.entitlements
       properties:
@@ -116,9 +120,11 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.riverray.PlusOne.MonitorExtension
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     sources:
       - Sources/Monitor
       - Sources/Shared
+      - Resources
     entitlements:
       path: Entitlements/MonitorExtension.entitlements
       properties:

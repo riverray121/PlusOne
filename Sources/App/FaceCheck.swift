@@ -253,6 +253,14 @@ final class FaceCheck: NSObject, ObservableObject {
         }
         guard samples.count > 8 else { return (0, 0) }
 
+        // Background rejection: keep only the contiguous surface around the
+        // median depth. At steep angles a face box can hang past a screen's
+        // edge, and far background samples fake both metrics.
+        let sorted = samples.map(\.z).sorted()
+        let median = sorted[sorted.count / 2]
+        samples.removeAll { abs($0.z - median) > 0.15 }
+        guard samples.count > 20 else { return (0, 0) }
+
         // Least-squares plane z = a*x + b*y + c via the 3x3 normal equations.
         let n = Float(samples.count)
         var sx: Float = 0, sy: Float = 0, sz: Float = 0
