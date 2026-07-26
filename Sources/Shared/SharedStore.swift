@@ -16,6 +16,7 @@ struct SharedStore {
         static let durationMinutes = "durationMinutes"
         static let cooldownMinutes = "cooldownMinutes"
         static let dailyCap = "dailyCap"
+        static let blockedDomains = "blockedDomains"
         static let pendingUnlock = "pendingUnlock"
         static let activeSessions = "activeSessions"
         static let sessionsToday = "sessionsToday"
@@ -60,6 +61,13 @@ struct SharedStore {
     var dailyCap: Int {
         get { defaults.integer(forKey: Key.dailyCap) }
         nonmutating set { defaults.set(newValue, forKey: Key.dailyCap) }
+    }
+
+    // PlusOne's own website blocklist (domain strings), enforced through the
+    // Screen Time content filter alongside the picker selection.
+    var blockedDomains: [String] {
+        get { defaults.stringArray(forKey: Key.blockedDomains) ?? [] }
+        nonmutating set { defaults.set(Array(Set(newValue)).sorted(), forKey: Key.blockedDomains) }
     }
 
     // MARK: Unlock flow state

@@ -17,6 +17,9 @@ struct HomeView: View {
                     pendingSection
                 }
                 blockedListSection
+                if appState.protectionEnabled, !SharedStore.shared.blockedDomains.isEmpty {
+                    websitesSection
+                }
                 #endif
             }
             .navigationTitle("PlusOne")
@@ -88,6 +91,33 @@ struct HomeView: View {
             }
         } footer: {
             Text("You tapped unlock on a blocked item. Pass the selfie check to open it.")
+        }
+    }
+
+    // Filtered domains have no shield button in Safari; unlocks start here.
+    private var websitesSection: some View {
+        Section {
+            ForEach(SharedStore.shared.blockedDomains, id: \.self) { domain in
+                HStack {
+                    Label(domain, systemImage: "globe")
+                    Spacer()
+                    if appState.activeSessions.contains(where: { $0.target == .domain(domain) }) {
+                        Text("Unlocked")
+                            .font(.footnote)
+                            .foregroundStyle(.orange)
+                    } else {
+                        Button("Unlock") {
+                            appState.captureRequest = CaptureRequest(target: .domain(domain))
+                        }
+                        .font(.footnote)
+                        .buttonStyle(.bordered)
+                    }
+                }
+            }
+        } header: {
+            Text("Blocked websites")
+        } footer: {
+            Text("Safari shows a restricted page for these; unlock them here.")
         }
     }
 

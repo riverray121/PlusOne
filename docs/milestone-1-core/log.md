@@ -14,6 +14,8 @@ Development context for resuming work. Keep entries to one line. Not a changelog
 - [ ] On-device verification of all Screen Time paths (shield, unlock hop, re-lock).
 
 ## Notes
+- Website blocklist: string domains (presets + custom) enforced via webContent.blockedByFilter. Tokens are opaque so app->domain pairing cannot be automatic. Safari shows its own restricted page; unlocks start from Home. String-domain sessions have no usage threshold: wall-clock re-lock at >= 15 min plus foreground backstop.
+- Depth metrics use median statistics (MAD residual, median bump) plus a +-15cm cluster around median depth: robust to specular IR noise from glossy screens and to background leakage past screen edges.
 - Depth liveness: on TrueDepth devices each counted face must deviate >= 4mm RMS from its best-fit plane (FaceCheck.minDepthResidual). Plane fit, not std dev: a tilted screen has depth spread but stays planar. Threshold needs on-device tuning; DEBUG builds show per-face residual in Capture.
 - Depth-path faces come from AVCaptureMetadataOutput (synchronized with video+depth); rects convert via outputRectConverted into the buffer space the depth map shares. Vision is 2D-fallback only: its mirrored-space rects were sampling the wrong depth region.
 - Capture flow is driven by sheet(item:) with a per-request CaptureRequest id; view phases are an explicit enum. Grant no longer collides with pendingUnlock clearing.

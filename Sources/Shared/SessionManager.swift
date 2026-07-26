@@ -65,6 +65,7 @@ struct SessionManager {
         case .application(let token): apps.insert(token)
         case .webDomain(let token): domains.insert(token)
         case .category(let token): categories.insert(token)
+        case .domain: break
         }
 
         let schedule = DeviceActivitySchedule(
@@ -72,13 +73,19 @@ struct SessionManager {
             intervalEnd: Calendar.current.dateComponents([.year, .month, .day, .hour, .minute, .second], from: end),
             repeats: false
         )
-        let event = DeviceActivityEvent(
-            applications: apps,
-            categories: categories,
-            webDomains: domains,
-            threshold: DateComponents(minute: minutes)
-        )
-        try center.startMonitoring(activity(for: id), during: schedule, events: [usageEvent: event])
+        // Usage thresholds need tokens; string-domain sessions re-lock on the
+        // wall clock (interval end, min 15 min) and the foreground backstop.
+        if apps.isEmpty, domains.isEmpty, categories.isEmpty {
+            try center.startMonitoring(activity(for: id), during: schedule)
+        } else {
+            let event = DeviceActivityEvent(
+                applications: apps,
+                categories: categories,
+                webDomains: domains,
+                threshold: DateComponents(minute: minutes)
+            )
+            try center.startMonitoring(activity(for: id), during: schedule, events: [usageEvent: event])
+        }
 
         var sessions = store.activeSessions
         sessions.append(UnlockSession(
@@ -123,6 +130,11 @@ struct SessionManager {
         center.stopMonitoring(sessions.map { activity(for: $0.id) })
         store.activeSessions = []
         store.lastSessionEnd = now
+        reapplyShields(now: now)
+    }
+
+    // Re-applies shields after a blocklist edit, respecting live sessions.
+    func refreshShields(now: Date = Date()) {
         reapplyShields(now: now)
     }
 
