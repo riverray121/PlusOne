@@ -2,16 +2,21 @@ import AVFoundation
 import Vision
 import UIKit
 
-// Live two-face verification. Pass requires `requiredFaces` faces, each tall
+// Live two-face verification. Pass requires `requiredFaces` faces, each large
 // enough to indicate physical presence, held for `holdDuration` of continuous
-// video. On TrueDepth hardware each face must also be a 3D surface, which
-// rejects faces shown on photos and screens. Frames never leave the capture
-// pipeline.
+// video. On TrueDepth hardware each face must also deviate from a flat plane,
+// which rejects faces shown on photos and screens. Frames never leave the
+// capture pipeline.
+//
+// Depth path: faces come from AVCaptureMetadataOutput, whose rects convert
+// into video-buffer pixel space via outputRectConverted, the same space the
+// depth map is aligned to. No hand-rolled orientation math.
+// 2D path (no TrueDepth: Macs, older devices): Vision detection only.
 final class FaceCheck: NSObject, ObservableObject {
     static let requiredFaces = 2
-    // Normalized bounding-box height below which a face is treated as a
-    // background face or a photo held at a distance.
-    static let minFaceHeight: CGFloat = 0.12
+    // Normalized face extent below which a face is treated as a background
+    // face or a photo held at a distance.
+    static let minFaceExtent: CGFloat = 0.12
     static let holdDuration: TimeInterval = 1.5
     // Minimum RMS deviation (meters) of a face region from its best-fit
     // plane. A tilted screen has depth spread but is still planar; a real
@@ -24,13 +29,14 @@ final class FaceCheck: NSObject, ObservableObject {
     @Published var cameraUnavailable = false
     @Published var depthActive = false
     #if DEBUG
-    // Per-frame depth spreads, for threshold tuning on device.
+    // Per-face plane residuals, for threshold tuning on device.
     @Published var debugDepthInfo = ""
     #endif
 
     let session = AVCaptureSession()
     private let videoOutput = AVCaptureVideoDataOutput()
     private let depthOutput = AVCaptureDepthDataOutput()
+    private let metadataOutput = AVCaptureMetadataOutput()
     private var synchronizer: AVCaptureDataOutputSynchronizer?
     private let processingQueue = DispatchQueue(label: "com.riverray.plusone.facecheck")
     private var isProcessing = false
@@ -76,25 +82,24 @@ final class FaceCheck: NSObject, ObservableObject {
         if session.canAddOutput(videoOutput) { session.addOutput(videoOutput) }
 
         var useDepth = false
-        if trueDepth != nil, session.canAddOutput(depthOutput) {
+        if trueDepth != nil,
+           session.canAddOutput(depthOutput),
+           session.canAddOutput(metadataOutput) {
             session.addOutput(depthOutput)
             depthOutput.isFilteringEnabled = true
-            if depthOutput.connection(with: .depthData) != nil {
+            session.addOutput(metadataOutput)
+            if depthOutput.connection(with: .depthData) != nil,
+               metadataOutput.availableMetadataObjectTypes.contains(.face) {
+                metadataOutput.metadataObjectTypes = [.face]
                 useDepth = true
             } else {
                 session.removeOutput(depthOutput)
+                session.removeOutput(metadataOutput)
             }
         }
 
         if useDepth {
-            // Deliver both streams portrait so Vision rects map onto the depth
-            // map without a coordinate transform.
-            for output in [videoOutput as AVCaptureOutput, depthOutput] {
-                if let conn = output.connections.first, conn.isVideoOrientationSupported {
-                    conn.videoOrientation = .portrait
-                }
-            }
-            let sync = AVCaptureDataOutputSynchronizer(dataOutputs: [videoOutput, depthOutput])
+            let sync = AVCaptureDataOutputSynchronizer(dataOutputs: [videoOutput, depthOutput, metadataOutput])
             sync.setDelegate(self, queue: processingQueue)
             synchronizer = sync
         } else {
@@ -105,37 +110,11 @@ final class FaceCheck: NSObject, ObservableObject {
         DispatchQueue.main.async { self.depthActive = useDepth }
     }
 
-    // MARK: Detection
+    // MARK: Shared pass/hold logic
 
-    private func detectFaces(in pixelBuffer: CVPixelBuffer, orientation: CGImagePropertyOrientation, depth: CVPixelBuffer?) {
-        guard !passed, !isProcessing else { return }
-        isProcessing = true
-
-        let request = VNDetectFaceRectanglesRequest { [weak self] request, _ in
-            guard let self else { return }
-            self.evaluate(faces: (request.results as? [VNFaceObservation]) ?? [], depth: depth)
-            self.isProcessing = false
-        }
-        let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: orientation)
-        do {
-            try handler.perform([request])
-        } catch {
-            isProcessing = false
-        }
-    }
-
-    private func evaluate(faces: [VNFaceObservation], depth: CVPixelBuffer?) {
-        let bigEnough = faces.filter { $0.boundingBox.height >= Self.minFaceHeight }
-
-        var spreads: [Float] = []
-        let valid = bigEnough.filter { face in
-            guard let depth else { return true }
-            let residual = Self.depthPlaneResidual(in: face.boundingBox, depth: depth)
-            spreads.append(residual)
-            return residual >= Self.minDepthResidual
-        }
-        let qualifies = valid.count >= Self.requiredFaces
-
+    // validCount is the number of qualifying faces this frame.
+    private func updateHold(validCount: Int, residuals: [Float]) {
+        let qualifies = validCount >= Self.requiredFaces
         let now = Date()
         if qualifies {
             if holdStart == nil { holdStart = now }
@@ -147,22 +126,75 @@ final class FaceCheck: NSObject, ObservableObject {
         let passed = elapsed >= Self.holdDuration
 
         DispatchQueue.main.async {
-            self.validFaceCount = valid.count
+            self.validFaceCount = validCount
             self.progress = progress
             if passed && !self.passed { self.passed = true }
             #if DEBUG
-            self.debugDepthInfo = spreads.isEmpty
+            self.debugDepthInfo = residuals.isEmpty
                 ? ""
-                : spreads.map { String(format: "%.1fmm", $0 * 1000) }.joined(separator: "  ")
+                : residuals.map { String(format: "%.1fmm", $0 * 1000) }.joined(separator: "  ")
             #endif
         }
     }
 
+    // MARK: Depth path evaluation
+
+    private func evaluateDepthPath(faces: [AVMetadataFaceObject], videoBuffer: CVPixelBuffer, depth: CVPixelBuffer) {
+        let videoW = CGFloat(CVPixelBufferGetWidth(videoBuffer))
+        let videoH = CGFloat(CVPixelBufferGetHeight(videoBuffer))
+        guard videoW > 0, videoH > 0 else { return }
+
+        var residuals: [Float] = []
+        var validCount = 0
+        for face in faces {
+            // Metadata rect -> video-buffer pixel rect (Apple-provided
+            // conversion), then normalized top-left-origin coordinates shared
+            // by the aligned depth map.
+            let pixelRect = videoOutput.outputRectConverted(fromMetadataOutputRect: face.bounds)
+            let norm = CGRect(
+                x: pixelRect.minX / videoW,
+                y: pixelRect.minY / videoH,
+                width: pixelRect.width / videoW,
+                height: pixelRect.height / videoH
+            )
+            // The buffer is landscape while the phone is portrait, so face
+            // height can land on either axis; use the larger extent.
+            guard max(norm.width, norm.height) >= Self.minFaceExtent else { continue }
+
+            let residual = Self.depthPlaneResidual(in: norm, depth: depth)
+            residuals.append(residual)
+            if residual >= Self.minDepthResidual { validCount += 1 }
+        }
+        updateHold(validCount: validCount, residuals: residuals)
+    }
+
+    // MARK: 2D path evaluation
+
+    private func detect2D(in pixelBuffer: CVPixelBuffer, orientation: CGImagePropertyOrientation) {
+        guard !passed, !isProcessing else { return }
+        isProcessing = true
+
+        let request = VNDetectFaceRectanglesRequest { [weak self] request, _ in
+            guard let self else { return }
+            let faces = (request.results as? [VNFaceObservation]) ?? []
+            let valid = faces.filter { $0.boundingBox.height >= Self.minFaceExtent }
+            self.updateHold(validCount: valid.count, residuals: [])
+            self.isProcessing = false
+        }
+        let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: orientation)
+        do {
+            try handler.perform([request])
+        } catch {
+            isProcessing = false
+        }
+    }
+
+    // MARK: Depth plane fit
+
     // RMS deviation (meters) of the central face region from its best-fit
     // plane. Distinguishes a 3D face from any flat surface at any tilt.
-    // Vision rects are normalized with a bottom-left origin; the depth map
-    // shares the video stream's portrait orientation.
-    private static func depthPlaneResidual(in boundingBox: CGRect, depth: CVPixelBuffer) -> Float {
+    // `normRect` is normalized with a top-left origin, matching buffer rows.
+    private static func depthPlaneResidual(in normRect: CGRect, depth: CVPixelBuffer) -> Float {
         CVPixelBufferLockBaseAddress(depth, .readOnly)
         defer { CVPixelBufferUnlockBaseAddress(depth, .readOnly) }
 
@@ -173,16 +205,15 @@ final class FaceCheck: NSObject, ObservableObject {
         let format = CVPixelBufferGetPixelFormatType(depth)
 
         // Central region only, so background pixels at the box edges don't
-        // inflate the spread of a flat photo.
-        let inset = boundingBox.insetBy(
-            dx: boundingBox.width * 0.2,
-            dy: boundingBox.height * 0.2
+        // inflate the residual of a flat photo.
+        let inset = normRect.insetBy(
+            dx: normRect.width * 0.2,
+            dy: normRect.height * 0.2
         )
         let x0 = max(0, Int(inset.minX * CGFloat(width)))
         let x1 = min(width - 1, Int(inset.maxX * CGFloat(width)))
-        // Flip y: Vision origin is bottom-left, buffer rows start at the top.
-        let y0 = max(0, Int((1 - inset.maxY) * CGFloat(height)))
-        let y1 = min(height - 1, Int((1 - inset.minY) * CGFloat(height)))
+        let y0 = max(0, Int(inset.minY * CGFloat(height)))
+        let y1 = min(height - 1, Int(inset.maxY * CGFloat(height)))
         guard x1 > x0, y1 > y0 else { return 0 }
 
         // 9x9 sample grid: (x, y, depth) triples for the plane fit.
@@ -246,20 +277,21 @@ final class FaceCheck: NSObject, ObservableObject {
     }
 }
 
-// Depth path: synchronized video + depth frames.
+// Depth path: synchronized video + depth + face metadata.
 extension FaceCheck: AVCaptureDataOutputSynchronizerDelegate {
     func dataOutputSynchronizer(_ synchronizer: AVCaptureDataOutputSynchronizer, didOutput synchronizedDataCollection: AVCaptureSynchronizedDataCollection) {
-        guard let videoData = synchronizedDataCollection.synchronizedData(for: videoOutput) as? AVCaptureSynchronizedSampleBufferData,
+        guard !passed,
+              let videoData = synchronizedDataCollection.synchronizedData(for: videoOutput) as? AVCaptureSynchronizedSampleBufferData,
               !videoData.sampleBufferWasDropped,
-              let pixelBuffer = CMSampleBufferGetImageBuffer(videoData.sampleBuffer)
+              let videoBuffer = CMSampleBufferGetImageBuffer(videoData.sampleBuffer),
+              let depthData = synchronizedDataCollection.synchronizedData(for: depthOutput) as? AVCaptureSynchronizedDepthData,
+              !depthData.depthDataWasDropped
         else { return }
 
-        let depthData = synchronizedDataCollection.synchronizedData(for: depthOutput) as? AVCaptureSynchronizedDepthData
-        let depthMap = (depthData?.depthDataWasDropped == false) ? depthData?.depthData.depthDataMap : nil
+        let faces = (synchronizedDataCollection.synchronizedData(for: metadataOutput) as? AVCaptureSynchronizedMetadataObjectData)?
+            .metadataObjects.compactMap { $0 as? AVMetadataFaceObject } ?? []
 
-        // Connection is already portrait; only mirroring remains, which does
-        // not affect detection.
-        detectFaces(in: pixelBuffer, orientation: .upMirrored, depth: depthMap)
+        evaluateDepthPath(faces: faces, videoBuffer: videoBuffer, depth: depthData.depthData.depthDataMap)
     }
 }
 
@@ -271,6 +303,6 @@ extension FaceCheck: AVCaptureVideoDataOutputSampleBufferDelegate {
         // delivers upright landscape ones.
         let orientation: CGImagePropertyOrientation =
             ProcessInfo.processInfo.isiOSAppOnMac ? .upMirrored : .leftMirrored
-        detectFaces(in: pixelBuffer, orientation: orientation, depth: nil)
+        detect2D(in: pixelBuffer, orientation: orientation)
     }
 }

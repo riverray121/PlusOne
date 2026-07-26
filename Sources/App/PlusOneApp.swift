@@ -14,17 +14,14 @@ struct PlusOneApp: App {
                 .onChange(of: scenePhase) { phase in
                     // Foreground pass: expire lapsed sessions and surface any
                     // unlock request written by the shield action extension.
+                    // refresh() opens the capture flow when a request exists.
                     if phase == .active {
                         SessionManager.shared.endExpiredSessions()
                         appState.refresh()
-                        if appState.pendingUnlock != nil {
-                            appState.showCapture = true
-                        }
                     }
                 }
                 .onReceive(NotificationCenter.default.publisher(for: .plusOneOpenCapture)) { _ in
                     appState.refresh()
-                    appState.showCapture = true
                 }
         }
     }
@@ -46,9 +43,15 @@ struct RootView: View {
             }
             #endif
         }
+        #if LITE
         .sheet(isPresented: $appState.showCapture) {
-            CaptureView()
+            CaptureView(target: nil)
         }
+        #else
+        .sheet(item: $appState.captureRequest, onDismiss: { appState.captureDidDismiss() }) { request in
+            CaptureView(target: request.target)
+        }
+        #endif
     }
 }
 

@@ -1,76 +1,54 @@
 import SwiftUI
 import AVFoundation
 
-// The unlock flow: gate check, live two-face check, then session grant.
+// The unlock flow for one request: gate check, live two-face check, grant.
+// A nil target is the lite/demo mode: camera check only, nothing unlocked.
 struct CaptureView: View {
+    let target: UnlockTarget?
+
     @EnvironmentObject private var appState: AppState
     @Environment(\.dismiss) private var dismiss
     @StateObject private var faceCheck = FaceCheck()
 
-    @State private var gate: SessionManager.GateResult = .allowed
-    @State private var granted = false
+    private enum Phase: Equatable {
+        case refused(SessionManager.GateResult)
+        case camera
+        case granted
+    }
+    @State private var phase: Phase = .camera
     @State private var grantError = false
 
     var body: some View {
         NavigationStack {
             Group {
-                #if LITE
-                // Lite build: no pending target or gates; camera check only.
-                if granted {
-                    grantedView
-                } else {
+                switch phase {
+                case .camera:
                     cameraView
-                }
-                #else
-                if appState.pendingUnlock == nil {
-                    noPendingView
-                } else if granted {
+                case .granted:
                     grantedView
-                } else {
-                    switch gate {
-                    case .allowed: cameraView
-                    case .coolingDown(let remaining): refusalView(
-                        icon: "hourglass",
-                        title: "Cooling down",
-                        message: "Next unlock available in \(Self.minutesUp(remaining)) min."
-                    )
-                    case .capReached(let cap): refusalView(
-                        icon: "calendar.badge.exclamationmark",
-                        title: "Daily cap reached",
-                        message: "You've used all \(cap) unlock sessions today."
-                    )
-                    case .sessionActive: refusalView(
-                        icon: "lock.open",
-                        title: "Session already active",
-                        message: "An unlock session is already running."
-                    )
-                    }
+                case .refused(let gate):
+                    refusalView(for: gate)
                 }
-                #endif
             }
-            .navigationTitle("Unlock")
+            .navigationTitle(phase == .granted ? "" : "Unlock")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                if !granted {
+                if phase != .granted {
                     ToolbarItem(placement: .cancellationAction) {
-                        Button("Cancel") {
-                            appState.clearPendingUnlock()
-                            dismiss()
-                        }
+                        Button("Cancel") { dismiss() }
                     }
                 }
             }
         }
-        .interactiveDismissDisabled(false)
         .onAppear {
-            // Sheets can be re-presented with stale state from a prior grant.
-            granted = false
-            #if LITE
+            if target != nil {
+                let gate = SessionManager.shared.gateCheck(for: target)
+                guard gate == .allowed else {
+                    phase = .refused(gate)
+                    return
+                }
+            }
             faceCheck.start()
-            #else
-            gate = SessionManager.shared.gateCheck(for: appState.pendingUnlock)
-            if gate == .allowed { faceCheck.start() }
-            #endif
         }
         .onDisappear { faceCheck.stop() }
         .onChange(of: faceCheck.passed) { passed in
@@ -78,7 +56,7 @@ struct CaptureView: View {
         }
     }
 
-    // MARK: Subviews
+    // MARK: Camera
 
     private var cameraView: some View {
         VStack(spacing: 16) {
@@ -141,25 +119,27 @@ struct CaptureView: View {
         }
     }
 
+    // MARK: Granted
+
     private var grantedView: some View {
         VStack(spacing: 20) {
             Spacer()
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 72))
                 .foregroundStyle(.green)
-            #if LITE
-            Text("Check passed")
-                .font(.largeTitle.bold())
-            Text("Two people detected. In the full build this unlocks the blocked app.")
-                .multilineTextAlignment(.center)
-                .foregroundStyle(.secondary)
-            #else
-            Text("You're in")
-                .font(.largeTitle.bold())
-            Text("Return to your app. It's unlocked for \(SharedStore.shared.durationMinutes) minutes of use, then locks itself.")
-                .multilineTextAlignment(.center)
-                .foregroundStyle(.secondary)
-            #endif
+            if target == nil {
+                Text("Check passed")
+                    .font(.largeTitle.bold())
+                Text("Two people detected. In the full build this unlocks the blocked app.")
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(.secondary)
+            } else {
+                Text("You're in")
+                    .font(.largeTitle.bold())
+                Text("Return to your app. It's unlocked for \(SharedStore.shared.durationMinutes) minutes of use, then locks itself.")
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(.secondary)
+            }
             Spacer()
             Button {
                 dismiss()
@@ -174,12 +154,32 @@ struct CaptureView: View {
         .padding(24)
     }
 
-    private var noPendingView: some View {
-        refusalView(
-            icon: "app.badge",
-            title: "Nothing to unlock",
-            message: "Tap a blocked app first, then choose \u{201C}Unlock with a selfie.\u{201D}"
-        )
+    // MARK: Refusals
+
+    @ViewBuilder
+    private func refusalView(for gate: SessionManager.GateResult) -> some View {
+        switch gate {
+        case .allowed:
+            EmptyView()
+        case .coolingDown(let remaining):
+            refusalView(
+                icon: "hourglass",
+                title: "Cooling down",
+                message: "Next unlock available in \(Self.minutesUp(remaining)) min."
+            )
+        case .capReached(let cap):
+            refusalView(
+                icon: "calendar.badge.exclamationmark",
+                title: "Daily cap reached",
+                message: "You've used all \(cap) unlock sessions today."
+            )
+        case .sessionActive:
+            refusalView(
+                icon: "lock.open",
+                title: "Already unlocked",
+                message: "This item has an active session. Open it directly."
+            )
+        }
     }
 
     private func refusalView(icon: String, title: String, message: String) -> some View {
@@ -199,18 +199,17 @@ struct CaptureView: View {
 
     private func grant() {
         faceCheck.stop()
-        #if LITE
-        granted = true
-        #else
-        guard let target = appState.pendingUnlock else { return }
+        guard let target else {
+            phase = .granted
+            return
+        }
         do {
             try SessionManager.shared.startSession(for: target)
             appState.refresh()
-            granted = true
+            phase = .granted
         } catch {
             grantError = true
         }
-        #endif
     }
 
     private static func minutesUp(_ seconds: TimeInterval) -> Int {

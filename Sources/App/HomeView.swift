@@ -80,7 +80,8 @@ struct HomeView: View {
     private var pendingSection: some View {
         Section {
             Button {
-                appState.showCapture = true
+                // refresh() opens the capture flow for the stored request.
+                appState.refresh()
             } label: {
                 Label("Take your unlock selfie", systemImage: "camera.fill")
                     .font(.headline)

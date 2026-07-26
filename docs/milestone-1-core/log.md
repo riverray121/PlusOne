@@ -15,6 +15,8 @@ Development context for resuming work. Keep entries to one line. Not a changelog
 
 ## Notes
 - Depth liveness: on TrueDepth devices each counted face must deviate >= 4mm RMS from its best-fit plane (FaceCheck.minDepthResidual). Plane fit, not std dev: a tilted screen has depth spread but stays planar. Threshold needs on-device tuning; DEBUG builds show per-face residual in Capture.
+- Depth-path faces come from AVCaptureMetadataOutput (synchronized with video+depth); rects convert via outputRectConverted into the buffer space the depth map shares. Vision is 2D-fallback only: its mirrored-space rects were sampling the wrong depth region.
+- Capture flow is driven by sheet(item:) with a per-request CaptureRequest id; view phases are an explicit enum. Grant no longer collides with pendingUnlock clearing.
 - Sessions are concurrent (one per item, DeviceActivity name "unlockSession-<uuid>"); gateCheck only refuses a target that is already unlocked.
 - Free Personal Teams do not support Family Controls at all; paid membership renewal in progress. Device registration list is also full until membership is active.
 - PlusOneLite target (temporary): entitlement-free, runs on free team and on Mac; remove after device testing.

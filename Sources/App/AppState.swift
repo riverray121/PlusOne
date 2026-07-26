@@ -29,7 +29,11 @@ final class AppState: ObservableObject {
     }
     @Published var pendingUnlock: UnlockTarget?
     @Published var activeSessions: [UnlockSession] = []
+    // Lite build only: presents the demo capture sheet.
     @Published var showCapture = false
+    // One capture flow per unlock request; sheet identity is tied to it so a
+    // new request always gets a fresh view with fresh state.
+    @Published var captureRequest: CaptureRequest?
 
     init() {
         onboarded = UserDefaults.standard.bool(forKey: "onboarded")
@@ -39,15 +43,26 @@ final class AppState: ObservableObject {
         activeSessions = store.activeSessions
     }
 
-    // Re-reads extension-written state (pending unlocks, ended sessions).
+    // Re-reads extension-written state (pending unlocks, ended sessions) and
+    // opens a capture flow for a new unlock request. Never tears down a flow
+    // already on screen; dismissal does that.
     func refresh() {
         pendingUnlock = store.pendingUnlock
         activeSessions = store.activeSessions
+        if let target = pendingUnlock, captureRequest == nil {
+            captureRequest = CaptureRequest(target: target)
+        }
     }
 
-    func clearPendingUnlock() {
-        store.pendingUnlock = nil
-        pendingUnlock = nil
+    // Sheet dismissed (Done, Cancel, or swipe): consume the request so the
+    // same one cannot re-present, then pick up any newer pending request.
+    func captureDidDismiss() {
+        let dismissed = captureRequest?.target
+        captureRequest = nil
+        if store.pendingUnlock == dismissed {
+            store.pendingUnlock = nil
+        }
+        refresh()
     }
 
     var blockedItemCount: Int {
@@ -55,4 +70,9 @@ final class AppState: ObservableObject {
             + selection.webDomainTokens.count
             + selection.categoryTokens.count
     }
+}
+
+struct CaptureRequest: Identifiable {
+    let id = UUID()
+    let target: UnlockTarget
 }
