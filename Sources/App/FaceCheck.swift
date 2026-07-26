@@ -285,26 +285,27 @@ final class FaceCheck: NSObject, ObservableObject {
             - sxy * (sxy * sz - syz * sx)
             + sxz * (sxy * sy - syy * sx)) / det
 
-        // RMS of residuals from the fitted plane.
-        let sumSq = samples.reduce(Float(0)) {
-            let r = $1.z - (a * $1.x + b * $1.y + c)
-            return $0 + r * r
-        }
-        let residual = (sumSq / n).squareRoot()
+        // Robust residual: MAD-based sigma, not RMS. Specular noise on a
+        // glossy screen shows up as scattered spikes that inflate RMS; the
+        // median deviation ignores them while a face's broad smooth curvature
+        // still registers.
+        let deviations = samples.map { abs($0.z - (a * $0.x + b * $0.y + c)) }.sorted()
+        let residual = 1.4826 * deviations[deviations.count / 2]
 
-        // Convexity: periphery depth minus center depth. Grid coords are
-        // normalized [0, 1]; the center block is the middle third.
-        var centerSum: Float = 0, centerN: Float = 0
-        var ringSum: Float = 0, ringN: Float = 0
+        // Convexity: periphery median depth minus center median depth. Grid
+        // coords are normalized [0, 1]; the center block is the middle third.
+        // Medians for the same spike-immunity reason.
+        var center: [Float] = []
+        var ring: [Float] = []
         for s in samples {
             if s.x > 0.33, s.x < 0.67, s.y > 0.33, s.y < 0.67 {
-                centerSum += s.z; centerN += 1
+                center.append(s.z)
             } else {
-                ringSum += s.z; ringN += 1
+                ring.append(s.z)
             }
         }
-        guard centerN > 0, ringN > 0 else { return (residual, 0) }
-        let bump = ringSum / ringN - centerSum / centerN
+        guard !center.isEmpty, !ring.isEmpty else { return (residual, 0) }
+        let bump = ring.sorted()[ring.count / 2] - center.sorted()[center.count / 2]
         return (residual, bump)
     }
 }

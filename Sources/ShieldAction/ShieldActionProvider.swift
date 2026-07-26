@@ -12,6 +12,17 @@ class ShieldActionProvider: ShieldActionDelegate {
         content.title = "Unlock with a selfie"
         content.body = "Tap to take a selfie with someone and unlock this \(target.displayNoun)."
         content.interruptionLevel = .timeSensitive
+        // Extension-posted banners don't reliably show an app icon; attach
+        // the logo as a thumbnail instead. Attachments consume their file, so
+        // hand over a temp copy.
+        if let icon = Bundle.main.url(forResource: "NotificationIcon", withExtension: "png") {
+            let tmp = FileManager.default.temporaryDirectory
+                .appendingPathComponent(UUID().uuidString + ".png")
+            try? FileManager.default.copyItem(at: icon, to: tmp)
+            if let attachment = try? UNNotificationAttachment(identifier: "icon", url: tmp) {
+                content.attachments = [attachment]
+            }
+        }
         let request = UNNotificationRequest(
             identifier: AppGroup.unlockNotificationId,
             content: content,
