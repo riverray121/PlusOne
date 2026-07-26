@@ -22,6 +22,10 @@ final class FaceCheck: NSObject, ObservableObject {
     // plane. A tilted screen has depth spread but is still planar; a real
     // face has a nose. Screens and photos land near sensor noise.
     static let minDepthResidual: Float = 0.004
+    // Minimum convexity (meters): how much closer the face's center sits than
+    // its periphery. Real noses bulge toward the camera; flat and waved
+    // screens don't, and curved photos rarely bulge in the right place.
+    static let minDepthBump: Float = 0.005
 
     @Published var validFaceCount = 0
     @Published var progress: Double = 0
@@ -161,9 +165,11 @@ final class FaceCheck: NSObject, ObservableObject {
             // height can land on either axis; use the larger extent.
             guard max(norm.width, norm.height) >= Self.minFaceExtent else { continue }
 
-            let residual = Self.depthPlaneResidual(in: norm, depth: depth)
-            residuals.append(residual)
-            if residual >= Self.minDepthResidual { validCount += 1 }
+            let metrics = Self.depthMetrics(in: norm, depth: depth)
+            residuals.append(contentsOf: [metrics.residual, metrics.bump])
+            if metrics.residual >= Self.minDepthResidual, metrics.bump >= Self.minDepthBump {
+                validCount += 1
+            }
         }
         updateHold(validCount: validCount, residuals: residuals)
     }
@@ -191,14 +197,17 @@ final class FaceCheck: NSObject, ObservableObject {
 
     // MARK: Depth plane fit
 
-    // RMS deviation (meters) of the central face region from its best-fit
-    // plane. Distinguishes a 3D face from any flat surface at any tilt.
+    // Two liveness metrics for a face region, both in meters:
+    // - residual: RMS deviation from the best-fit plane. Separates a 3D face
+    //   from any flat surface at any tilt.
+    // - bump: mean depth of the periphery minus the center. Positive when the
+    //   region bulges toward the camera, as a nose does.
     // `normRect` is normalized with a top-left origin, matching buffer rows.
-    private static func depthPlaneResidual(in normRect: CGRect, depth: CVPixelBuffer) -> Float {
+    private static func depthMetrics(in normRect: CGRect, depth: CVPixelBuffer) -> (residual: Float, bump: Float) {
         CVPixelBufferLockBaseAddress(depth, .readOnly)
         defer { CVPixelBufferUnlockBaseAddress(depth, .readOnly) }
 
-        guard let base = CVPixelBufferGetBaseAddress(depth) else { return 0 }
+        guard let base = CVPixelBufferGetBaseAddress(depth) else { return (0, 0) }
         let width = CVPixelBufferGetWidth(depth)
         let height = CVPixelBufferGetHeight(depth)
         let rowBytes = CVPixelBufferGetBytesPerRow(depth)
@@ -214,7 +223,7 @@ final class FaceCheck: NSObject, ObservableObject {
         let x1 = min(width - 1, Int(inset.maxX * CGFloat(width)))
         let y0 = max(0, Int(inset.minY * CGFloat(height)))
         let y1 = min(height - 1, Int(inset.maxY * CGFloat(height)))
-        guard x1 > x0, y1 > y0 else { return 0 }
+        guard x1 > x0, y1 > y0 else { return (0, 0) }
 
         // 9x9 sample grid: (x, y, depth) triples for the plane fit.
         var samples: [(x: Float, y: Float, z: Float)] = []
@@ -231,7 +240,7 @@ final class FaceCheck: NSObject, ObservableObject {
                 case kCVPixelFormatType_DepthFloat16, kCVPixelFormatType_DisparityFloat16:
                     v = Float(row.assumingMemoryBound(to: Float16.self)[x])
                 default:
-                    return 0
+                    return (0, 0)
                 }
                 // Disparity is 1/meters; convert so the threshold is metric.
                 if format == kCVPixelFormatType_DisparityFloat32 || format == kCVPixelFormatType_DisparityFloat16 {
@@ -242,7 +251,7 @@ final class FaceCheck: NSObject, ObservableObject {
                 }
             }
         }
-        guard samples.count > 8 else { return 0 }
+        guard samples.count > 8 else { return (0, 0) }
 
         // Least-squares plane z = a*x + b*y + c via the 3x3 normal equations.
         let n = Float(samples.count)
@@ -257,7 +266,7 @@ final class FaceCheck: NSObject, ObservableObject {
         let det = sxx * (syy * n - sy * sy)
             - sxy * (sxy * n - sy * sx)
             + sx * (sxy * sy - syy * sx)
-        guard abs(det) > .ulpOfOne else { return 0 }
+        guard abs(det) > .ulpOfOne else { return (0, 0) }
         let a = (sxz * (syy * n - sy * sy)
             - sxy * (syz * n - sy * sz)
             + sx * (syz * sy - syy * sz)) / det
@@ -273,7 +282,22 @@ final class FaceCheck: NSObject, ObservableObject {
             let r = $1.z - (a * $1.x + b * $1.y + c)
             return $0 + r * r
         }
-        return (sumSq / n).squareRoot()
+        let residual = (sumSq / n).squareRoot()
+
+        // Convexity: periphery depth minus center depth. Grid coords are
+        // normalized [0, 1]; the center block is the middle third.
+        var centerSum: Float = 0, centerN: Float = 0
+        var ringSum: Float = 0, ringN: Float = 0
+        for s in samples {
+            if s.x > 0.33, s.x < 0.67, s.y > 0.33, s.y < 0.67 {
+                centerSum += s.z; centerN += 1
+            } else {
+                ringSum += s.z; ringN += 1
+            }
+        }
+        guard centerN > 0, ringN > 0 else { return (residual, 0) }
+        let bump = ringSum / ringN - centerSum / centerN
+        return (residual, bump)
     }
 }
 

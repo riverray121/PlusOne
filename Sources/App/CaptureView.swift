@@ -203,12 +203,18 @@ struct CaptureView: View {
             phase = .granted
             return
         }
-        do {
-            try SessionManager.shared.startSession(for: target)
-            appState.refresh()
-            phase = .granted
-        } catch {
-            grantError = true
+        // Screen Time calls are cross-process and can block for seconds;
+        // keep them off the main thread so the UI stays responsive.
+        Task.detached(priority: .userInitiated) {
+            do {
+                try SessionManager.shared.startSession(for: target)
+                await MainActor.run {
+                    appState.refresh()
+                    phase = .granted
+                }
+            } catch {
+                await MainActor.run { grantError = true }
+            }
         }
     }
 

@@ -23,6 +23,7 @@ targets:
     sources:
       - Sources/App
       - Sources/Shared
+      - Resources
     entitlements:
       path: Entitlements/PlusOne.entitlements
       properties:
@@ -54,6 +55,7 @@ targets:
     sources:
       - Sources/App
       - Sources/Shared
+      - Resources
     info:
       path: Info/PlusOneLite-Info.plist
       properties:
