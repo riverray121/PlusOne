@@ -54,15 +54,14 @@ final class AppState: ObservableObject {
         }
     }
 
-    // Sheet dismissed (Done, Cancel, or swipe): consume the request so the
-    // same one cannot re-present, then pick up any newer pending request.
+    // Sheet dismissed (Done, Cancel, or swipe): consume the pending request
+    // unconditionally so nothing re-presents. sheet(item:) nils the binding
+    // before onDismiss runs, so the dismissed target cannot be read here.
     func captureDidDismiss() {
-        let dismissed = captureRequest?.target
         captureRequest = nil
-        if store.pendingUnlock == dismissed {
-            store.pendingUnlock = nil
-        }
-        refresh()
+        store.pendingUnlock = nil
+        pendingUnlock = nil
+        activeSessions = store.activeSessions
     }
 
     var blockedItemCount: Int {
