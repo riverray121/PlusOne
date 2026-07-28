@@ -20,8 +20,6 @@ struct ShieldController {
         var exceptApps: Set<ApplicationToken> = []
         var exceptDomains: Set<WebDomainToken> = []
 
-        var filterDomains = Set(SharedStore.shared.blockedDomains.map { WebDomain(domain: $0) })
-
         for target in excluded {
             switch target {
             case .application(let token):
@@ -32,8 +30,6 @@ struct ShieldController {
                 exceptDomains.insert(token)
             case .category(let token):
                 categories.remove(token)
-            case .domain(let string):
-                filterDomains.remove(WebDomain(domain: string))
             }
         }
 
@@ -45,11 +41,10 @@ struct ShieldController {
         store.shield.webDomainCategories = categories.isEmpty
             ? nil
             : .specific(categories, except: exceptDomains)
-        // The string blocklist rides the content filter; Safari shows its own
-        // restricted page for these, and unlocks start from inside PlusOne.
-        store.webContent.blockedByFilter = filterDomains.isEmpty
-            ? nil
-            : .specific(filterDomains)
+        // Apple's adult-content filter; independent of the picker selection.
+        store.webContent.blockedByFilter = SharedStore.shared.adultFilterEnabled
+            ? .auto([], except: [])
+            : nil
     }
 
     // Removes all shields (protection toggled off).

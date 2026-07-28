@@ -16,7 +16,7 @@ struct SharedStore {
         static let durationMinutes = "durationMinutes"
         static let cooldownMinutes = "cooldownMinutes"
         static let dailyCap = "dailyCap"
-        static let blockedDomains = "blockedDomains"
+        static let adultFilter = "adultFilter"
         static let pendingUnlock = "pendingUnlock"
         static let activeSessions = "activeSessions"
         static let sessionsToday = "sessionsToday"
@@ -63,11 +63,11 @@ struct SharedStore {
         nonmutating set { defaults.set(newValue, forKey: Key.dailyCap) }
     }
 
-    // PlusOne's own website blocklist (domain strings), enforced through the
-    // Screen Time content filter alongside the picker selection.
-    var blockedDomains: [String] {
-        get { defaults.stringArray(forKey: Key.blockedDomains) ?? [] }
-        nonmutating set { defaults.set(Array(Set(newValue)).sorted(), forKey: Key.blockedDomains) }
+    // Apple's machine-learned adult-content web filter. Hard block, no
+    // selfie unlock.
+    var adultFilterEnabled: Bool {
+        get { defaults.bool(forKey: Key.adultFilter) }
+        nonmutating set { defaults.set(newValue, forKey: Key.adultFilter) }
     }
 
     // MARK: Unlock flow state

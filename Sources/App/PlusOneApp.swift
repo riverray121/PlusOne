@@ -17,6 +17,9 @@ struct PlusOneApp: App {
                     // refresh() opens the capture flow when a request exists.
                     if phase == .active {
                         SessionManager.shared.endExpiredSessions()
+                        // Settings changed in older builds can leave stale
+                        // store state; re-assert current policy.
+                        SessionManager.shared.refreshShields()
                         appState.refresh()
                     }
                 }
