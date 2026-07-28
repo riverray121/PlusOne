@@ -34,8 +34,9 @@ class ShieldActionProvider: ShieldActionDelegate {
     }
 
     override func handle(action: ShieldAction, for application: ApplicationToken, completionHandler: @escaping (ShieldActionResponse) -> Void) {
+        let hard = SharedStore.shared.hardSelection.applicationTokens.contains(application)
         switch action {
-        case .primaryButtonPressed:
+        case .primaryButtonPressed where !hard:
             requestUnlock(.application(application), completionHandler: completionHandler)
         default:
             completionHandler(.close)
@@ -43,8 +44,9 @@ class ShieldActionProvider: ShieldActionDelegate {
     }
 
     override func handle(action: ShieldAction, for webDomain: WebDomainToken, completionHandler: @escaping (ShieldActionResponse) -> Void) {
+        let hard = SharedStore.shared.hardSelection.webDomainTokens.contains(webDomain)
         switch action {
-        case .primaryButtonPressed:
+        case .primaryButtonPressed where !hard:
             requestUnlock(.webDomain(webDomain), completionHandler: completionHandler)
         default:
             completionHandler(.close)
@@ -52,8 +54,9 @@ class ShieldActionProvider: ShieldActionDelegate {
     }
 
     override func handle(action: ShieldAction, for category: ActivityCategoryToken, completionHandler: @escaping (ShieldActionResponse) -> Void) {
+        let hard = SharedStore.shared.hardSelection.categoryTokens.contains(category)
         switch action {
-        case .primaryButtonPressed:
+        case .primaryButtonPressed where !hard:
             requestUnlock(.category(category), completionHandler: completionHandler)
         default:
             completionHandler(.close)

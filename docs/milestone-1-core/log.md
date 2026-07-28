@@ -14,6 +14,8 @@ Development context for resuming work. Keep entries to one line. Not a changelog
 - [ ] On-device verification of all Screen Time paths (shield, unlock hop, re-lock).
 
 ## Notes
+- iOS web filter has NO pure blocklist mode: any blockedByFilter policy (.specific included) implies the adult filter, and it disables Safari private browsing. So webContent serves only the adult toggle (.auto on, explicit FilterPolicy.none off; bare .none resolves to Optional nil = remove, which can leave the filter stuck).
+- Hard blocks are a second FamilyActivitySelection (hardSelection), always shielded, excluded from session exceptions; shield extensions render a no-unlock variant by token membership.
 - Website blocklist: string domains (presets + custom) enforced via webContent.blockedByFilter. Tokens are opaque so app->domain pairing cannot be automatic. Safari shows its own restricted page; unlocks start from Home. String-domain sessions have no usage threshold: wall-clock re-lock at >= 15 min plus foreground backstop.
 - Depth metrics use median statistics (MAD residual, median bump) plus a +-15cm cluster around median depth: robust to specular IR noise from glossy screens and to background leakage past screen edges.
 - Depth liveness: on TrueDepth devices each counted face must deviate >= 4mm RMS from its best-fit plane (FaceCheck.minDepthResidual). Plane fit, not std dev: a tilted screen has depth spread but stays planar. Threshold needs on-device tuning; DEBUG builds show per-face residual in Capture.

@@ -17,7 +17,7 @@ struct SharedStore {
         static let cooldownMinutes = "cooldownMinutes"
         static let dailyCap = "dailyCap"
         static let adultFilter = "adultFilter"
-        static let blockedDomains = "blockedDomains"
+        static let hardSelection = "hardSelection"
         static let pendingUnlock = "pendingUnlock"
         static let activeSessions = "activeSessions"
         static let sessionsToday = "sessionsToday"
@@ -71,10 +71,18 @@ struct SharedStore {
         nonmutating set { defaults.set(newValue, forKey: Key.adultFilter) }
     }
 
-    // Hard-blocked website domains: filtered permanently, no selfie unlock.
-    var blockedDomains: [String] {
-        get { defaults.stringArray(forKey: Key.blockedDomains) ?? [] }
-        nonmutating set { defaults.set(Array(Set(newValue)).sorted(), forKey: Key.blockedDomains) }
+    // Second picker selection: hard-blocked items. Always shielded, and the
+    // shield offers no unlock.
+    var hardSelection: FamilyActivitySelection {
+        get {
+            guard let data = defaults.data(forKey: Key.hardSelection),
+                  let value = try? decoder.decode(FamilyActivitySelection.self, from: data)
+            else { return FamilyActivitySelection() }
+            return value
+        }
+        nonmutating set {
+            defaults.set(try? encoder.encode(newValue), forKey: Key.hardSelection)
+        }
     }
 
     // MARK: Unlock flow state

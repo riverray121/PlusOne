@@ -123,13 +123,16 @@ struct HomeView: View {
     }
 
     private var hardBlockSummary: String {
-        let count = SharedStore.shared.blockedDomains.count
+        let hard = SharedStore.shared.hardSelection
+        let count = hard.applicationTokens.count
+            + hard.webDomainTokens.count
+            + hard.categoryTokens.count
         let adult = SharedStore.shared.adultFilterEnabled
         switch (count, adult) {
         case (0, false): return "Off"
         case (0, true): return "Adult"
-        case (_, false): return "\(count) sites"
-        case (_, true): return "\(count) sites + adult"
+        case (_, false): return "\(count) items"
+        case (_, true): return "\(count) items + adult"
         }
     }
 }

@@ -13,6 +13,7 @@ struct ShieldController {
     // Category-shielded items are excluded via the policy's `except` sets.
     func applyShields(excluding excluded: [UnlockTarget] = []) {
         let selection = SharedStore.shared.selection
+        let hard = SharedStore.shared.hardSelection
 
         var apps = selection.applicationTokens
         var domains = selection.webDomainTokens
@@ -33,6 +34,14 @@ struct ShieldController {
             }
         }
 
+        // Hard-blocked items join after session exclusions so a session can
+        // never unshield them.
+        apps.formUnion(hard.applicationTokens)
+        domains.formUnion(hard.webDomainTokens)
+        categories.formUnion(hard.categoryTokens)
+        exceptApps.subtract(hard.applicationTokens)
+        exceptDomains.subtract(hard.webDomainTokens)
+
         store.shield.applications = apps.isEmpty ? nil : apps
         store.shield.webDomains = domains.isEmpty ? nil : domains
         store.shield.applicationCategories = categories.isEmpty
@@ -41,19 +50,12 @@ struct ShieldController {
         store.shield.webDomainCategories = categories.isEmpty
             ? nil
             : .specific(categories, except: exceptDomains)
-        // Hard blocks: custom domains plus Apple's adult-content filter.
-        // Never excluded by sessions; there is no selfie unlock for these.
-        // Off writes an explicit allow-all policy: removing the setting (nil)
-        // can leave the previous filter engaged, and a bare `.none` assignment
-        // resolves to Optional.none, which is exactly that nil removal.
-        let hard = Set(SharedStore.shared.blockedDomains.map { WebDomain(domain: $0) })
-        if SharedStore.shared.adultFilterEnabled {
-            store.webContent.blockedByFilter = .auto(hard, except: [])
-        } else if !hard.isEmpty {
-            store.webContent.blockedByFilter = .specific(hard)
-        } else {
-            store.webContent.blockedByFilter = WebContentSettings.FilterPolicy.none
-        }
+        // The web filter serves ONLY the adult toggle. Any filter policy on
+        // iOS implies adult filtering (there is no pure blocklist mode), so
+        // custom hard blocks go through shields above, never through here.
+        store.webContent.blockedByFilter = SharedStore.shared.adultFilterEnabled
+            ? .auto([], except: [])
+            : WebContentSettings.FilterPolicy.none
     }
 
     // Removes all shields (protection toggled off).
