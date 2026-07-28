@@ -96,10 +96,40 @@ struct HomeView: View {
             Button {
                 showPicker = true
             } label: {
-                Label("Edit blocked list", systemImage: "list.bullet")
+                HStack {
+                    Label("Selfie-unlock blocks", systemImage: "person.2.fill")
+                    Spacer()
+                    Text("\(appState.blockedItemCount)")
+                        .foregroundStyle(.secondary)
+                }
             }
+            .foregroundStyle(.primary)
+
+            NavigationLink {
+                HardBlockView()
+            } label: {
+                HStack {
+                    Label("Hard blocks", systemImage: "nosign")
+                    Spacer()
+                    Text(hardBlockSummary)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        } header: {
+            Text("Blocking")
         } footer: {
-            Text("\(appState.blockedItemCount) item(s) blocked, including any websites picked. Unlocking requires a selfie with at least two people in it.")
+            Text("Selfie-unlock blocks open after a selfie with at least two people. Hard blocks never open.")
+        }
+    }
+
+    private var hardBlockSummary: String {
+        let count = SharedStore.shared.blockedDomains.count
+        let adult = SharedStore.shared.adultFilterEnabled
+        switch (count, adult) {
+        case (0, false): return "Off"
+        case (0, true): return "Adult"
+        case (_, false): return "\(count) sites"
+        case (_, true): return "\(count) sites + adult"
         }
     }
 }

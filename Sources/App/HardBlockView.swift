@@ -21,8 +21,7 @@ struct HardBlockView: View {
     ]
 
     var body: some View {
-        NavigationStack {
-            List {
+        List {
                 Section {
                     Toggle("Block adult websites", isOn: $adultFilter)
                         .onChange(of: adultFilter) { on in
@@ -70,9 +69,8 @@ struct HardBlockView: View {
                     Text("Hard blocks have no selfie unlock. iOS also restricts each site's matching app while its domain is blocked. For selfie-unlockable blocking, use the Photo Block tab.")
                 }
             }
-            .navigationTitle("Hard Block")
-            .scrollDismissesKeyboard(.interactively)
-        }
+        .navigationTitle("Hard blocks")
+        .scrollDismissesKeyboard(.interactively)
     }
 
     // MARK: Helpers
