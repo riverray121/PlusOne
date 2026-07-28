@@ -41,10 +41,12 @@ struct ShieldController {
         store.shield.webDomainCategories = categories.isEmpty
             ? nil
             : .specific(categories, except: exceptDomains)
-        // Apple's adult-content filter; independent of the picker selection.
+        // Hard blocks: custom domains plus Apple's adult-content filter.
+        // Never excluded by sessions; there is no selfie unlock for these.
+        let hard = Set(SharedStore.shared.blockedDomains.map { WebDomain(domain: $0) })
         store.webContent.blockedByFilter = SharedStore.shared.adultFilterEnabled
-            ? .auto([], except: [])
-            : nil
+            ? .auto(hard, except: [])
+            : (hard.isEmpty ? nil : .specific(hard))
     }
 
     // Removes all shields (protection toggled off).

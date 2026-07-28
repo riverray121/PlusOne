@@ -17,6 +17,7 @@ struct SharedStore {
         static let cooldownMinutes = "cooldownMinutes"
         static let dailyCap = "dailyCap"
         static let adultFilter = "adultFilter"
+        static let blockedDomains = "blockedDomains"
         static let pendingUnlock = "pendingUnlock"
         static let activeSessions = "activeSessions"
         static let sessionsToday = "sessionsToday"
@@ -68,6 +69,12 @@ struct SharedStore {
     var adultFilterEnabled: Bool {
         get { defaults.bool(forKey: Key.adultFilter) }
         nonmutating set { defaults.set(newValue, forKey: Key.adultFilter) }
+    }
+
+    // Hard-blocked website domains: filtered permanently, no selfie unlock.
+    var blockedDomains: [String] {
+        get { defaults.stringArray(forKey: Key.blockedDomains) ?? [] }
+        nonmutating set { defaults.set(Array(Set(newValue)).sorted(), forKey: Key.blockedDomains) }
     }
 
     // MARK: Unlock flow state

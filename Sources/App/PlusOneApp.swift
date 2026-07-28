@@ -40,7 +40,12 @@ struct RootView: View {
             HomeView()
             #else
             if appState.onboarded {
-                HomeView()
+                TabView {
+                    HomeView()
+                        .tabItem { Label("Photo Block", systemImage: "person.2.fill") }
+                    HardBlockView()
+                        .tabItem { Label("Hard Block", systemImage: "nosign") }
+                }
             } else {
                 OnboardingView()
             }

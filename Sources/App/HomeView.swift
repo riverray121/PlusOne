@@ -3,7 +3,7 @@ import FamilyControls
 
 struct HomeView: View {
     @EnvironmentObject private var appState: AppState
-    @State private var showBlockedList = false
+    @State private var showPicker = false
     @State private var showSettings = false
 
     var body: some View {
@@ -30,7 +30,7 @@ struct HomeView: View {
                 }
             }
             .sheet(isPresented: $showSettings) { SettingsView() }
-            .sheet(isPresented: $showBlockedList) { BlockedListView() }
+            .familyActivityPicker(isPresented: $showPicker, selection: $appState.selection)
         }
     }
 
@@ -94,12 +94,12 @@ struct HomeView: View {
     private var blockedListSection: some View {
         Section {
             Button {
-                showBlockedList = true
+                showPicker = true
             } label: {
                 Label("Edit blocked list", systemImage: "list.bullet")
             }
         } footer: {
-            Text("\(appState.blockedItemCount) item(s) blocked. Unlocking requires a selfie with at least two people in it.")
+            Text("\(appState.blockedItemCount) item(s) blocked, including any websites picked. Unlocking requires a selfie with at least two people in it.")
         }
     }
 }
