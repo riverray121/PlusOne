@@ -137,7 +137,7 @@ struct CaptureView: View {
             } else {
                 Text("You're in")
                     .font(.largeTitle.bold())
-                Text("Return to your app. It's unlocked for \(SharedStore.shared.durationMinutes) minutes of use, then locks itself.")
+                Text("Return to your app. It's unlocked for \(pluralMinutes(SharedStore.shared.durationMinutes)) of use, then locks itself.")
                     .multilineTextAlignment(.center)
                     .foregroundStyle(.secondary)
             }

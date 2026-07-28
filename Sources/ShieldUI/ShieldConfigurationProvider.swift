@@ -12,7 +12,7 @@ class ShieldConfigurationProvider: ShieldConfigurationDataSource {
             icon: UIImage(systemName: "person.2.fill"),
             title: .init(text: "Blocked by PlusOne", color: .white),
             subtitle: .init(
-                text: "Take a selfie with someone to unlock \(SharedStore.shared.durationMinutes) minutes.",
+                text: "Take a selfie with someone to unlock \(pluralMinutes(SharedStore.shared.durationMinutes)).",
                 color: UIColor.white.withAlphaComponent(0.8)
             ),
             primaryButtonLabel: .init(text: "Unlock with a selfie", color: .black),

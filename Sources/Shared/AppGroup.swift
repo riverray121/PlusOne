@@ -14,3 +14,8 @@ enum AppGroup {
     // Notification posted by the shield action to route the user into the app.
     static let unlockNotificationId = "com.riverray.plusone.unlock"
 }
+
+// "1 minute" / "5 minutes"
+func pluralMinutes(_ n: Int) -> String {
+    n == 1 ? "1 minute" : "\(n) minutes"
+}
