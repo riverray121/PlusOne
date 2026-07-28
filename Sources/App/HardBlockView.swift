@@ -29,7 +29,11 @@ struct HardBlockView: View {
                             applyNow()
                         }
                 } footer: {
+                    #if DEBUG
+                    Text("Apple's adult-content filter for Safari.\nstore: adult=\(SharedStore.shared.adultFilterEnabled ? "ON" : "off"), \(SharedStore.shared.blockedDomains.count) sites")
+                    #else
                     Text("Apple's adult-content filter for Safari.")
+                    #endif
                 }
 
                 Section {
@@ -107,9 +111,11 @@ struct HardBlockView: View {
     }
 
     private func applyNow() {
-        if SharedStore.shared.protectionEnabled {
-            SessionManager.shared.refreshShields()
-        }
+        guard SharedStore.shared.protectionEnabled else { return }
+        // Full clear-then-reapply pulse: replicates the protection off/on
+        // cycle, which is what reliably dislodges a stuck web filter.
+        ShieldController.shared.clearShields()
+        SessionManager.shared.refreshShields()
     }
 
     // "https://www.Reddit.com/r/all" -> "reddit.com"
