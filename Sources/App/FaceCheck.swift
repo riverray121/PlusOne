@@ -26,6 +26,10 @@ final class FaceCheck: NSObject, ObservableObject {
     // its periphery. Real noses bulge toward the camera; flat and waved
     // screens don't, and curved photos rarely bulge in the right place.
     static let minDepthBump: Float = 0.005
+    // Max frame-to-frame drift (normalized) for a face to count. Fast motion
+    // smears depth/video alignment into fake curvature; a smear needs speed,
+    // and speed means drift. Still-but-flat surfaces fail the metrics anyway.
+    static let maxDrift: CGFloat = 0.05
 
     @Published var validFaceCount = 0
     @Published var progress: Double = 0
@@ -45,6 +49,8 @@ final class FaceCheck: NSObject, ObservableObject {
     private let processingQueue = DispatchQueue(label: "com.riverray.plusone.facecheck")
     private var isProcessing = false
     private var holdStart: Date?
+    // Face centers from the previous depth-path frame, for the drift gate.
+    private var previousCenters: [CGPoint] = []
 
     func start() {
         processingQueue.async { [self] in
@@ -159,6 +165,7 @@ final class FaceCheck: NSObject, ObservableObject {
         guard videoW > 0, videoH > 0 else { return }
 
         var validCount = 0
+        var centers: [CGPoint] = []
         #if DEBUG
         var debugFaces: [String] = []
         #endif
@@ -179,13 +186,23 @@ final class FaceCheck: NSObject, ObservableObject {
 
             let metrics = Self.depthMetrics(in: norm, depth: depth)
             let solid = metrics.residual >= Self.minDepthResidual && metrics.bump >= Self.minDepthBump
-            if solid { validCount += 1 }
+
+            // Stability: the face must match one from the previous frame
+            // within the drift limit. First sighting doesn't count yet.
+            let center = CGPoint(x: norm.midX, y: norm.midY)
+            centers.append(center)
+            let still = previousCenters.contains {
+                hypot($0.x - center.x, $0.y - center.y) <= Self.maxDrift
+            }
+
+            if solid && still { validCount += 1 }
             #if DEBUG
             debugFaces.append(String(format: "%@ res %.1fmm bump %.1fmm",
-                                     solid ? "PASS" : "FAIL",
+                                     !still ? "MOVE" : solid ? "PASS" : "FAIL",
                                      metrics.residual * 1000, metrics.bump * 1000))
             #endif
         }
+        previousCenters = centers
         updateHold(validCount: validCount)
         #if DEBUG
         updateDebug(debugFaces)
