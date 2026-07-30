@@ -42,7 +42,19 @@ class SessionMonitor: DeviceActivityMonitor {
             return
         }
         guard let id = sessionId(from: activity) else { return }
-        SessionManager.shared.endSession(id: id)
+        switch event.rawValue {
+        case AppGroup.sessionWarnEventName:
+            let left = SharedStore.shared.sessionWarnMinutes
+            Notifier.post(
+                id: AppGroup.sessionWarningNotificationId,
+                title: "Session ending soon",
+                body: "You have \(pluralMinutes(left)) left on this unlock."
+            )
+        case AppGroup.usageEventName:
+            SessionManager.shared.endSession(id: id)
+        default:
+            break
+        }
     }
 
     override func intervalDidEnd(for activity: DeviceActivityName) {

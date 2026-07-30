@@ -10,12 +10,16 @@ enum AppGroup {
     // DeviceActivity identifiers for the unlock session lifecycle.
     static let activityName = "unlockSession"
     static let usageEventName = "usageLimit"
+    static let sessionWarnEventName = "sessionWarn"
 
     // Notification posted by the shield action to route the user into the app.
     static let unlockNotificationId = "com.riverray.plusone.unlock"
 
     // Notification posted by the monitor when a time limit is nearly spent.
     static let limitWarningNotificationId = "com.riverray.plusone.limitWarning"
+
+    // Notification posted by the monitor when an unlock session is nearly over.
+    static let sessionWarningNotificationId = "com.riverray.plusone.sessionWarning"
 }
 
 // "1 minute" / "5 minutes"

@@ -21,6 +21,7 @@ struct SharedStore {
         static let timeLimitRules = "timeLimitRules"
         static let exhaustedLimits = "exhaustedLimits"
         static let warnMinutesLeft = "warnMinutesLeft"
+        static let sessionWarnMinutes = "sessionWarnMinutes"
         static let armedLimits = "armedLimits"
         static let pendingUnlock = "pendingUnlock"
         static let activeSessions = "activeSessions"
@@ -66,6 +67,13 @@ struct SharedStore {
     var dailyCap: Int {
         get { defaults.integer(forKey: Key.dailyCap) }
         nonmutating set { defaults.set(newValue, forKey: Key.dailyCap) }
+    }
+
+    // Minutes-remaining mark for the session warning notification. 0 = off.
+    // Applies to sessions started after a change.
+    var sessionWarnMinutes: Int {
+        get { defaults.object(forKey: Key.sessionWarnMinutes) as? Int ?? 1 }
+        nonmutating set { defaults.set(newValue, forKey: Key.sessionWarnMinutes) }
     }
 
     // Apple's machine-learned adult-content web filter. Hard block, no

@@ -13,6 +13,7 @@ struct SessionManager {
     private let center = DeviceActivityCenter()
 
     private var usageEvent: DeviceActivityEvent.Name { .init(AppGroup.usageEventName) }
+    private var warnEvent: DeviceActivityEvent.Name { .init(AppGroup.sessionWarnEventName) }
 
     private func activity(for id: String) -> DeviceActivityName {
         .init("\(AppGroup.activityName)-\(id)")
@@ -72,13 +73,24 @@ struct SessionManager {
             intervalEnd: Calendar.current.dateComponents([.year, .month, .day, .hour, .minute, .second], from: end),
             repeats: false
         )
-        let event = DeviceActivityEvent(
-            applications: apps,
-            categories: categories,
-            webDomains: domains,
-            threshold: DateComponents(minute: minutes)
-        )
-        try center.startMonitoring(activity(for: id), during: schedule, events: [usageEvent: event])
+        var events: [DeviceActivityEvent.Name: DeviceActivityEvent] = [
+            usageEvent: DeviceActivityEvent(
+                applications: apps,
+                categories: categories,
+                webDomains: domains,
+                threshold: DateComponents(minute: minutes)
+            )
+        ]
+        let warn = store.sessionWarnMinutes
+        if warn > 0, minutes - warn >= 1 {
+            events[warnEvent] = DeviceActivityEvent(
+                applications: apps,
+                categories: categories,
+                webDomains: domains,
+                threshold: DateComponents(minute: minutes - warn)
+            )
+        }
+        try center.startMonitoring(activity(for: id), during: schedule, events: events)
 
         var sessions = store.activeSessions
         sessions.append(UnlockSession(
