@@ -9,6 +9,7 @@ struct SelfieBlockView: View {
     @State private var cooldown = SharedStore.shared.cooldownMinutes
     @State private var cap = SharedStore.shared.dailyCap
     @State private var warn = SharedStore.shared.sessionWarnMinutes
+    @State private var queued: QueuedNotice?
 
     private let durationOptions = [1, 2, 3, 5, 10, 15, 20, 30, 45, 60]
     private let cooldownOptions = [0, 5, 15, 30, 60, 120]
@@ -18,31 +19,56 @@ struct SelfieBlockView: View {
     var body: some View {
         List {
             // appState.selection's observer persists and re-shields on every
-            // assignment, so commit needs no extra work here.
+            // assignment, so commit needs no extra work here. Removal is a
+            // weakening: the gate decides whether it applies or queues.
             SelectionEditor(
                 selection: $appState.selection,
-                footer: "Blocked until a selfie shows at least two people, then unlocked for the duration below. Swipe an item left to remove it."
+                footer: "Blocked until a selfie shows at least two people, then unlocked for the duration below. Swipe an item left to remove it.",
+                removal: { removed in
+                    switch ProtectionGate.shared.propose(.removeSelfieItems(removed)) {
+                    case .applied:
+                        return true
+                    case .queued(let change):
+                        queued = QueuedNotice(change)
+                        return false
+                    }
+                }
             ) { _ in }
 
             Section {
                 Picker("Unlock duration", selection: $duration) {
                     ForEach(durationOptions, id: \.self) { Text("\($0) min") }
                 }
-                .onChange(of: duration) { SharedStore.shared.durationMinutes = $0 }
+                .onChange(of: duration) { minutes in
+                    if case .queued(let change) = ProtectionGate.shared.propose(.setDuration(minutes)) {
+                        queued = QueuedNotice(change)
+                        duration = SharedStore.shared.durationMinutes
+                    }
+                }
 
                 Picker("Cooldown", selection: $cooldown) {
                     ForEach(cooldownOptions, id: \.self) {
                         Text($0 == 0 ? "Off" : "\($0) min")
                     }
                 }
-                .onChange(of: cooldown) { SharedStore.shared.cooldownMinutes = $0 }
+                .onChange(of: cooldown) { minutes in
+                    if case .queued(let change) = ProtectionGate.shared.propose(.setCooldown(minutes)) {
+                        queued = QueuedNotice(change)
+                        cooldown = SharedStore.shared.cooldownMinutes
+                    }
+                }
 
                 Picker("Daily cap", selection: $cap) {
                     ForEach(capOptions, id: \.self) {
                         Text($0 == 0 ? "Off" : "\($0) sessions")
                     }
                 }
-                .onChange(of: cap) { SharedStore.shared.dailyCap = $0 }
+                .onChange(of: cap) { sessions in
+                    if case .queued(let change) = ProtectionGate.shared.propose(.setDailyCap(sessions)) {
+                        queued = QueuedNotice(change)
+                        cap = SharedStore.shared.dailyCap
+                    }
+                }
 
                 Picker("Warn when minutes left", selection: $warn) {
                     ForEach(warnOptions, id: \.self) {
@@ -62,5 +88,12 @@ struct SelfieBlockView: View {
         }
         .navigationTitle("Selfie-unlock blocks")
         .navigationBarTitleDisplayMode(.inline)
+        // Pending applies elsewhere can change these; never show stale values.
+        .onAppear {
+            duration = SharedStore.shared.durationMinutes
+            cooldown = SharedStore.shared.cooldownMinutes
+            cap = SharedStore.shared.dailyCap
+        }
+        .queuedChangeAlert($queued)
     }
 }

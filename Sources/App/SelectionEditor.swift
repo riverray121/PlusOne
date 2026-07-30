@@ -19,6 +19,10 @@ import ManagedSettings
 struct SelectionEditor: View {
     @Binding var selection: FamilyActivitySelection
     let footer: String
+    // Asked before a row removal is applied, with the removed tokens as a
+    // token-only selection. Return false to keep the selection unchanged
+    // (the removal was queued elsewhere). nil = removals always apply.
+    var removal: ((FamilyActivitySelection) -> Bool)? = nil
     let commit: (FamilyActivitySelection) -> Void
 
     @State private var showPicker = false
@@ -36,7 +40,14 @@ struct SelectionEditor: View {
             .familyActivityPicker(isPresented: $showPicker, selection: $pickerBuffer)
             .onChange(of: showPicker) { presented in
                 guard !presented else { return }
-                apply(pickerBuffer)
+                // The picker only adds. Deselections made inside it are
+                // discarded by unioning the prior tokens back in: removal is
+                // the token rows' job, where it can be gated as a weakening.
+                var merged = pickerBuffer
+                merged.applicationTokens.formUnion(selection.applicationTokens)
+                merged.webDomainTokens.formUnion(selection.webDomainTokens)
+                merged.categoryTokens.formUnion(selection.categoryTokens)
+                apply(merged)
             }
         } footer: {
             Text(footer)
@@ -90,11 +101,12 @@ struct SelectionEditor: View {
         domains: [WebDomainToken] = [],
         categories: [ActivityCategoryToken] = []
     ) {
-        var fresh = FamilyActivitySelection()
-        fresh.applicationTokens = selection.applicationTokens.subtracting(apps)
-        fresh.webDomainTokens = selection.webDomainTokens.subtracting(domains)
-        fresh.categoryTokens = selection.categoryTokens.subtracting(categories)
-        apply(fresh)
+        var removed = FamilyActivitySelection()
+        removed.applicationTokens = Set(apps)
+        removed.webDomainTokens = Set(domains)
+        removed.categoryTokens = Set(categories)
+        if let removal, !removal(removed) { return }
+        apply(selection.subtracting(removed))
     }
 
     private func apply(_ newValue: FamilyActivitySelection) {

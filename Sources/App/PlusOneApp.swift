@@ -1,5 +1,6 @@
 import SwiftUI
 import UserNotifications
+import CloudKit
 
 @main
 struct PlusOneApp: App {
@@ -18,10 +19,12 @@ struct PlusOneApp: App {
                     // refresh() surfaces an unlock request written by the
                     // shield action extension.
                     if phase == .active {
+                        ProtectionGate.shared.applyDue()
                         SessionManager.shared.endExpiredSessions()
                         TimeLimitManager.shared.clearLapsedExhausted()
                         SessionManager.shared.refreshShields()
                         appState.refresh()
+                        Task { await FriendSync.shared.sync() }
                     }
                 }
                 .onReceive(NotificationCenter.default.publisher(for: .plusOneOpenCapture)) { _ in
@@ -52,14 +55,41 @@ extension Notification.Name {
     static let plusOneOpenCapture = Notification.Name("plusOneOpenCapture")
 }
 
-// Routes unlock-notification taps into the capture flow.
+// Routes unlock-notification taps into the capture flow, CloudKit pushes
+// into FriendSync, and share acceptance into the companion pairing flow.
 final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
     func application(
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
     ) -> Bool {
         UNUserNotificationCenter.current().delegate = self
+        // Silent registration (no user prompt); CloudKit subscription pushes
+        // need it on both sides of a pairing.
+        application.registerForRemoteNotifications()
         return true
+    }
+
+    // The share-acceptance callback only reaches a scene delegate, so one is
+    // injected here; SwiftUI keeps managing the window.
+    func application(
+        _ application: UIApplication,
+        configurationForConnecting connectingSceneSession: UISceneSession,
+        options: UIScene.ConnectionOptions
+    ) -> UISceneConfiguration {
+        let configuration = UISceneConfiguration(name: nil, sessionRole: connectingSceneSession.role)
+        configuration.delegateClass = SceneDelegate.self
+        return configuration
+    }
+
+    func application(
+        _ application: UIApplication,
+        didReceiveRemoteNotification userInfo: [AnyHashable: Any],
+        fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
+    ) {
+        Task { @MainActor in
+            let handled = await FriendSync.shared.handleRemoteNotification(userInfo)
+            completionHandler(handled ? .newData : .noData)
+        }
     }
 
     func userNotificationCenter(
@@ -80,5 +110,16 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
         completionHandler([.banner, .sound])
+    }
+}
+
+final class SceneDelegate: NSObject, UIWindowSceneDelegate {
+    func windowScene(
+        _ windowScene: UIWindowScene,
+        userDidAcceptCloudKitShareWith cloudKitShareMetadata: CKShare.Metadata
+    ) {
+        Task { @MainActor in
+            FriendSync.shared.acceptShare(metadata: cloudKitShareMetadata)
+        }
     }
 }

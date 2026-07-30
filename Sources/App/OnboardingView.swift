@@ -64,8 +64,14 @@ struct OnboardingView: View {
                 }
 
                 Section {
+                    Label("For real accountability, ask a friend to set this device's Screen Time passcode. Without one, PlusOne's protections can be cleared by revoking its Screen Time permission.", systemImage: "key.fill")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+
+                Section {
                     Button {
-                        appState.protectionEnabled = true
+                        appState.setProtection(true)
                         appState.onboarded = true
                     } label: {
                         Text("Start protecting")

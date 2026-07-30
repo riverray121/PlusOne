@@ -28,6 +28,23 @@ Doomscroll if you must, but not alone.
 
 Optional limits: a cooldown between sessions and a daily session cap.
 
+## Anti-tamper
+
+Quitting on impulse is the failure mode, so weakening the setup is slow and
+visible:
+
+- **Settings change delay**: any change that weakens protection (removing a
+  blocked item, lengthening the unlock duration, turning protection off)
+  waits a configurable 1 to 72 hours, with a visible countdown and one-tap
+  cancel. Strengthening is always immediate.
+- **Delete prevention**: an optional toggle holds the OS app-removal
+  restriction, so no app on the device can be deleted while it is on
+  (device-wide by iOS design). Turning it off goes through the delay.
+- **Friend approval**: pair with one friend through iCloud. Weakening changes
+  are sent to their copy of PlusOne in plain language; approval applies the
+  change immediately, denial discards it, and silence falls back to the delay
+  countdown. Unpairing itself needs approval or the delay.
+
 ## Architecture
 
 Four targets, mandated by the Screen Time API design:
@@ -42,7 +59,10 @@ Four targets, mandated by the Screen Time API design:
 State is shared through an App Group. Session limits are enforced by
 `DeviceActivity` usage thresholds; a wall clock interval and a
 foreground-expiry check back that up. All processing is on-device: no server,
-no analytics, and selfie frames are analyzed in memory, never written.
+no analytics, and selfie frames are analyzed in memory, never written. Friend
+approval syncs through CloudKit (Apple-operated, iCloud accounts, no backend
+of ours); the only data that leaves the device is the approval requests and
+responses themselves.
 
 ## Building
 
@@ -61,9 +81,10 @@ shield apps or use the camera.
 
 ## Honest limitations
 
-- iOS does not allow a self-managed app to be un-removable: you can always
-  revoke Screen Time permission or delete the app. PlusOne is friction, not a
-  jail.
+- iOS does not let a self-managed app fully protect itself: revoking
+  PlusOne's Screen Time permission in Settings clears every restriction,
+  delete prevention included. A friend-held Screen Time passcode closes that
+  gap; without one, PlusOne is friction, not a jail.
 - The two-face check is a behavioral nudge, not biometric security. A
   sufficiently motivated person can defeat it. That person could also just
   delete the app.

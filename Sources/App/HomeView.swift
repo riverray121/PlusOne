@@ -3,6 +3,7 @@ import FamilyControls
 
 struct HomeView: View {
     @EnvironmentObject private var appState: AppState
+    @State private var queued: QueuedNotice?
 
     var body: some View {
         NavigationStack {
@@ -11,18 +12,32 @@ struct HomeView: View {
                 if appState.pendingUnlock != nil {
                     pendingSection
                 }
+                if !SharedStore.shared.pendingChanges.isEmpty {
+                    pendingChangesSection
+                }
                 blockedListSection
+                antiTamperSection
             }
             .navigationTitle("PlusOne")
             // Summary counts read SharedStore directly; re-render on return
             // from child screens so they never show stale values.
             .onAppear { appState.refresh() }
+            .queuedChangeAlert($queued)
         }
     }
 
     private var statusSection: some View {
         Section {
-            Toggle(isOn: $appState.protectionEnabled) {
+            // Off is a weakening: route through the gate, which may queue it
+            // and leave the toggle on.
+            Toggle(isOn: Binding(
+                get: { appState.protectionEnabled },
+                set: { on in
+                    if let change = appState.setProtection(on) {
+                        queued = QueuedNotice(change)
+                    }
+                }
+            )) {
                 Label(
                     appState.protectionEnabled ? "Protection on" : "Protection off",
                     systemImage: appState.protectionEnabled ? "shield.fill" : "shield.slash"
@@ -108,6 +123,40 @@ struct HomeView: View {
             Text("Blocking")
         } footer: {
             Text("Selfie-unlock blocks open after a selfie with at least two people. Hard blocks never open. Time limits grant a budget of minutes per hour or day.")
+        }
+    }
+
+    private var pendingChangesSection: some View {
+        Section {
+            NavigationLink {
+                PendingChangesView()
+            } label: {
+                HStack {
+                    Label("Pending changes", systemImage: "clock")
+                    Spacer()
+                    Text("\(SharedStore.shared.pendingChanges.count)")
+                        .foregroundStyle(.secondary)
+                }
+            }
+        } footer: {
+            Text("Weakening changes waiting out the settings change delay.")
+        }
+    }
+
+    private var antiTamperSection: some View {
+        Section {
+            NavigationLink {
+                AntiTamperView()
+            } label: {
+                HStack {
+                    Label("Anti-tamper", systemImage: "lock.shield")
+                    Spacer()
+                    Text(delayHoursLabel(SharedStore.shared.delayMinutes))
+                        .foregroundStyle(.secondary)
+                }
+            }
+        } footer: {
+            Text("Delay weakening changes so protection cannot be dropped on impulse.")
         }
     }
 

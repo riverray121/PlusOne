@@ -7,6 +7,7 @@ import FamilyControls
 // the whole sheet down when it closes, losing the edit.
 struct TimeLimitsView: View {
     @State private var rules = SharedStore.shared.timeLimitRules
+    @State private var queued: QueuedNotice?
 
     var body: some View {
         List {
@@ -35,30 +36,29 @@ struct TimeLimitsView: View {
             }
         }
         .navigationTitle("Time limits")
+        .onAppear { rules = SharedStore.shared.timeLimitRules }
+        .queuedChangeAlert($queued)
     }
 
+    // The gate persists and resyncs monitoring. A save that weakens the rule
+    // (more minutes, day to hour, items removed) queues; anything else, and
+    // all new rules, apply immediately.
     private func save(_ saved: TimeLimitRule) {
-        if let index = rules.firstIndex(where: { $0.id == saved.id }) {
-            rules[index] = saved
-        } else {
-            rules.append(saved)
+        switch ProtectionGate.shared.propose(.upsertTimeLimitRule(saved)) {
+        case .applied:
+            rules = SharedStore.shared.timeLimitRules
+        case .queued(let change):
+            queued = QueuedNotice(change)
         }
-        persist()
     }
 
     private func delete(at offsets: IndexSet) {
-        rules.remove(atOffsets: offsets)
-        persist()
-    }
-
-    private func persist() {
-        SharedStore.shared.timeLimitRules = rules
-        guard SharedStore.shared.protectionEnabled else { return }
-        // Screen Time XPC calls block; keep them off the main thread.
-        Task.detached {
-            TimeLimitManager.shared.syncMonitoring()
-            SessionManager.shared.refreshShields()
+        for rule in offsets.map({ rules[$0] }) {
+            if case .queued(let change) = ProtectionGate.shared.propose(.deleteTimeLimitRule(rule.id)) {
+                queued = QueuedNotice(change)
+            }
         }
+        rules = SharedStore.shared.timeLimitRules
     }
 }
 

@@ -33,8 +33,25 @@ func pluralItems(_ n: Int) -> String {
     n == 1 ? "1 item" : "\(n) items"
 }
 
+// "Off" / "1 hour" / "12 hours"
+func delayHoursLabel(_ minutes: Int) -> String {
+    guard minutes > 0 else { return "Off" }
+    let hours = minutes / 60
+    return hours == 1 ? "1 hour" : "\(hours) hours"
+}
+
 extension FamilyActivitySelection {
     var itemCount: Int {
         applicationTokens.count + webDomainTokens.count + categoryTokens.count
+    }
+
+    // Token-only rebuild: carrying the member views over lets a removed token
+    // resurrect through an encode/decode round trip.
+    func subtracting(_ other: FamilyActivitySelection) -> FamilyActivitySelection {
+        var fresh = FamilyActivitySelection()
+        fresh.applicationTokens = applicationTokens.subtracting(other.applicationTokens)
+        fresh.webDomainTokens = webDomainTokens.subtracting(other.webDomainTokens)
+        fresh.categoryTokens = categoryTokens.subtracting(other.categoryTokens)
+        return fresh
     }
 }

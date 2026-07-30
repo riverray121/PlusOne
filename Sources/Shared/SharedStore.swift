@@ -22,6 +22,10 @@ struct SharedStore {
         static let exhaustedLimits = "exhaustedLimits"
         static let sessionWarnMinutes = "sessionWarnMinutes"
         static let armedLimits = "armedLimits"
+        static let delayMinutes = "delayMinutes"
+        static let pendingChanges = "pendingChanges"
+        static let deletePrevention = "deletePrevention"
+        static let friendPaired = "friendPaired"
         static let pendingUnlock = "pendingUnlock"
         static let activeSessions = "activeSessions"
         static let sessionsToday = "sessionsToday"
@@ -95,6 +99,34 @@ struct SharedStore {
     var hardSelection: FamilyActivitySelection {
         get { decoded(Key.hardSelection) ?? FamilyActivitySelection() }
         nonmutating set { encode(newValue, forKey: Key.hardSelection) }
+    }
+
+    // MARK: Anti-tamper
+
+    // Minutes a weakening change waits before applying. 0 = off.
+    var delayMinutes: Int {
+        get { defaults.integer(forKey: Key.delayMinutes) }
+        nonmutating set { defaults.set(newValue, forKey: Key.delayMinutes) }
+    }
+
+    // Weakening changes waiting out the delay. Written only by ProtectionGate.
+    var pendingChanges: [PendingChange] {
+        get { decoded(Key.pendingChanges) ?? [] }
+        nonmutating set { encode(newValue, forKey: Key.pendingChanges) }
+    }
+
+    // Mirrors the OS app-removal restriction held on the managed settings
+    // store. The restriction is device-wide.
+    var deletePreventionEnabled: Bool {
+        get { defaults.bool(forKey: Key.deletePrevention) }
+        nonmutating set { defaults.set(newValue, forKey: Key.deletePrevention) }
+    }
+
+    // Whether a friend is paired for approvals. Mirrored from CloudKit by the
+    // app target; ProtectionGate only reads it.
+    var friendPaired: Bool {
+        get { defaults.bool(forKey: Key.friendPaired) }
+        nonmutating set { defaults.set(newValue, forKey: Key.friendPaired) }
     }
 
     // MARK: Time limits

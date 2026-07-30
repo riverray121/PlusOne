@@ -68,6 +68,12 @@ struct ShieldController {
             : WebContentSettings.FilterPolicy.none
     }
 
+    // The OS app-removal restriction, device-wide by design. Independent of
+    // shields: clearShields leaves it alone.
+    func setDenyAppRemoval(_ deny: Bool) {
+        store.application.denyAppRemoval = deny ? true : nil
+    }
+
     // Removes all shields (protection toggled off).
     func clearShields() {
         store.shield.applications = nil
