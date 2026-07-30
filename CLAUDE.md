@@ -24,7 +24,7 @@ Only the ACTIVE milestone is current; ignore shipped ones unless asked.
 
 ## Git
 - Remote: `riverray121/PlusOne` (GitHub, public)
-- Push: as work completes; no per-slice user-testing gate
+- Commit locally as work completes; push only when the user asks or approves
 
 ## Standing rules
 - Public portfolio repo: clean history, presentable README, no secrets, no

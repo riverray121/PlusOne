@@ -108,7 +108,13 @@ struct TimeLimitEditView: View {
         }
         .navigationTitle(isNew ? "New limit" : "Edit limit")
         .navigationBarTitleDisplayMode(.inline)
+        // Leaving is an explicit choice: Save or Cancel, no back button, so
+        // edits can't be silently dropped.
+        .navigationBarBackButtonHidden(true)
         .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Cancel") { dismiss() }
+            }
             ToolbarItem(placement: .confirmationAction) {
                 Button("Save") {
                     onSave(rule)
