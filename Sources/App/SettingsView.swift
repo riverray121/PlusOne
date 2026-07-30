@@ -59,6 +59,7 @@ struct SettingsView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
                         .bold()
+                        .tint(.blue)
                 }
             }
         }

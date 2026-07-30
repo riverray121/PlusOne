@@ -149,6 +149,7 @@ struct TimeLimitEditView: View {
                         dismiss()
                     }
                     .bold()
+                    .tint(.blue)
                     .disabled(rule.itemCount == 0)
                 }
             }
