@@ -18,6 +18,9 @@ struct HomeView: View {
                 #endif
             }
             .navigationTitle("PlusOne")
+            // Summary counts read SharedStore directly; re-render on return
+            // from child screens so they never show stale values.
+            .onAppear { appState.refresh() }
         }
     }
 

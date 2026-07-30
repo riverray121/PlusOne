@@ -72,8 +72,6 @@ struct TimeLimitEditView: View {
     let isNew: Bool
     let onSave: (TimeLimitRule) -> Void
 
-    @State private var showPicker = false
-
     private var minuteOptions: [Int] {
         let all = [1, 2, 3, 5, 10, 15, 20, 30, 45, 60, 90, 120]
         return rule.period == .hour ? all.filter { $0 < 60 } : all
@@ -82,19 +80,11 @@ struct TimeLimitEditView: View {
 
     var body: some View {
         Form {
-            Section {
-                Button {
-                    showPicker = true
-                } label: {
-                    HStack {
-                        Label("Choose apps and websites", systemImage: "square.grid.2x2")
-                        Spacer()
-                        Text("\(rule.itemCount)")
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .foregroundStyle(.primary)
-            }
+            // The rule is local until Save, so commit needs no extra work.
+            SelectionEditor(
+                selection: $rule.selection,
+                footer: "Everything in this limit shares its pool of minutes. Swipe an item left to remove it."
+            ) { _ in }
 
             Section {
                 Picker("Minutes", selection: $rule.minutes) {
@@ -118,7 +108,6 @@ struct TimeLimitEditView: View {
         }
         .navigationTitle(isNew ? "New limit" : "Edit limit")
         .navigationBarTitleDisplayMode(.inline)
-        .familyActivityPicker(isPresented: $showPicker, selection: $rule.selection)
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
                 Button("Save") {

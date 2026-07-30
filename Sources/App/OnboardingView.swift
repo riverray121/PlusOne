@@ -12,6 +12,7 @@ struct OnboardingView: View {
     @State private var cameraGranted = false
     @State private var notificationsGranted = false
     @State private var showPicker = false
+    @State private var pickerBuffer = FamilyActivitySelection()
 
     var body: some View {
         NavigationStack {
@@ -79,7 +80,16 @@ struct OnboardingView: View {
                 }
             }
             .navigationTitle("Welcome")
-            .familyActivityPicker(isPresented: $showPicker, selection: $appState.selection)
+            // Same buffered-picker pattern as SelectionEditor: the picker
+            // never holds a live binding to canonical state.
+            .familyActivityPicker(isPresented: $showPicker, selection: $pickerBuffer)
+            .onChange(of: showPicker) { presented in
+                if presented {
+                    pickerBuffer = appState.selection
+                } else {
+                    appState.selection = pickerBuffer
+                }
+            }
         }
     }
 

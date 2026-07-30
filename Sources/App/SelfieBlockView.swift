@@ -5,7 +5,6 @@ import FamilyControls
 // only govern selfie unlocks (duration, cooldown, daily cap).
 struct SelfieBlockView: View {
     @EnvironmentObject private var appState: AppState
-    @State private var showPicker = false
     @State private var duration = SharedStore.shared.durationMinutes
     @State private var cooldown = SharedStore.shared.cooldownMinutes
     @State private var cap = SharedStore.shared.dailyCap
@@ -18,21 +17,12 @@ struct SelfieBlockView: View {
 
     var body: some View {
         List {
-            Section {
-                Button {
-                    showPicker = true
-                } label: {
-                    HStack {
-                        Label("Choose apps and websites", systemImage: "square.grid.2x2")
-                        Spacer()
-                        Text("\(appState.blockedItemCount)")
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .foregroundStyle(.primary)
-            } footer: {
-                Text("Blocked until a selfie shows at least two people, then unlocked for the duration below.")
-            }
+            // appState.selection's observer persists and re-shields on every
+            // assignment, so commit needs no extra work here.
+            SelectionEditor(
+                selection: $appState.selection,
+                footer: "Blocked until a selfie shows at least two people, then unlocked for the duration below. Swipe an item left to remove it."
+            ) { _ in }
 
             Section {
                 Picker("Unlock duration", selection: $duration) {
@@ -72,6 +62,5 @@ struct SelfieBlockView: View {
         }
         .navigationTitle("Selfie-unlock blocks")
         .navigationBarTitleDisplayMode(.inline)
-        .familyActivityPicker(isPresented: $showPicker, selection: $appState.selection)
     }
 }
