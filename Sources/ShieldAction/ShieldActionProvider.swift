@@ -1,5 +1,4 @@
 import ManagedSettings
-import UserNotifications
 
 // Handles the shield's unlock button. Extensions cannot launch the app, so
 // this records the request and posts a notification whose tap opens PlusOne.

@@ -7,15 +7,11 @@ struct HomeView: View {
     var body: some View {
         NavigationStack {
             List {
-                #if LITE
-                liteSection
-                #else
                 statusSection
                 if appState.pendingUnlock != nil {
                     pendingSection
                 }
                 blockedListSection
-                #endif
             }
             .navigationTitle("PlusOne")
             // Summary counts read SharedStore directly; re-render on return
@@ -23,22 +19,6 @@ struct HomeView: View {
             .onAppear { appState.refresh() }
         }
     }
-
-    #if LITE
-    // Lite build: blocking is unavailable; the camera check is tested directly.
-    private var liteSection: some View {
-        Section {
-            Button {
-                appState.showCapture = true
-            } label: {
-                Label("Test the selfie check", systemImage: "camera.fill")
-                    .font(.headline)
-            }
-        } footer: {
-            Text("Lite build: blocking is disabled. This runs the two-face camera check only.")
-        }
-    }
-    #endif
 
     private var statusSection: some View {
         Section {
@@ -49,7 +29,7 @@ struct HomeView: View {
                 )
                 .foregroundStyle(appState.protectionEnabled ? .green : .secondary)
             }
-            .disabled(appState.blockedItemCount == 0)
+            .disabled(!hasAnyBlocking)
 
             ForEach(appState.activeSessions, id: \.id) { session in
                 Label(
@@ -59,12 +39,21 @@ struct HomeView: View {
                 .foregroundStyle(.orange)
             }
 
-            if appState.blockedItemCount == 0 {
+            if !hasAnyBlocking {
                 Text("Pick at least one app or website to protect.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
         }
+    }
+
+    // Protection is meaningful with any kind of blocking configured, not just
+    // selfie-unlock items.
+    private var hasAnyBlocking: Bool {
+        appState.selfieBlockItemCount > 0
+            || SharedStore.shared.hardSelection.itemCount > 0
+            || SharedStore.shared.adultFilterEnabled
+            || !SharedStore.shared.timeLimitRules.isEmpty
     }
 
     private var pendingSection: some View {
@@ -89,7 +78,7 @@ struct HomeView: View {
                 HStack {
                     Label("Selfie-unlock blocks", systemImage: "person.2.fill")
                     Spacer()
-                    Text("\(appState.blockedItemCount)")
+                    Text("\(appState.selfieBlockItemCount)")
                         .foregroundStyle(.secondary)
                 }
             }
@@ -124,14 +113,15 @@ struct HomeView: View {
 
     private var timeLimitSummary: String {
         let count = SharedStore.shared.timeLimitRules.count
-        return count == 0 ? "Off" : (count == 1 ? "1 limit" : "\(count) limits")
+        switch count {
+        case 0: return "Off"
+        case 1: return "1 limit"
+        default: return "\(count) limits"
+        }
     }
 
     private var hardBlockSummary: String {
-        let hard = SharedStore.shared.hardSelection
-        let count = hard.applicationTokens.count
-            + hard.webDomainTokens.count
-            + hard.categoryTokens.count
+        let count = SharedStore.shared.hardSelection.itemCount
         let adult = SharedStore.shared.adultFilterEnabled
         switch (count, adult) {
         case (0, false): return "Off"

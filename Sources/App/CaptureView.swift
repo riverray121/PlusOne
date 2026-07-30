@@ -2,9 +2,8 @@ import SwiftUI
 import AVFoundation
 
 // The unlock flow for one request: gate check, live two-face check, grant.
-// A nil target is the lite/demo mode: camera check only, nothing unlocked.
 struct CaptureView: View {
-    let target: UnlockTarget?
+    let target: UnlockTarget
 
     @EnvironmentObject private var appState: AppState
     @Environment(\.dismiss) private var dismiss
@@ -41,12 +40,10 @@ struct CaptureView: View {
             }
         }
         .onAppear {
-            if target != nil {
-                let gate = SessionManager.shared.gateCheck(for: target)
-                guard gate == .allowed else {
-                    phase = .refused(gate)
-                    return
-                }
+            let gate = SessionManager.shared.gateCheck(for: target)
+            guard gate == .allowed else {
+                phase = .refused(gate)
+                return
             }
             faceCheck.start()
         }
@@ -128,19 +125,11 @@ struct CaptureView: View {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 72))
                 .foregroundStyle(.green)
-            if target == nil {
-                Text("Check passed")
-                    .font(.largeTitle.bold())
-                Text("Two people detected. In the full build this unlocks the blocked app.")
-                    .multilineTextAlignment(.center)
-                    .foregroundStyle(.secondary)
-            } else {
-                Text("You're in")
-                    .font(.largeTitle.bold())
-                Text("Return to your app. It's unlocked for \(pluralMinutes(SharedStore.shared.durationMinutes)) of use, then locks itself.")
-                    .multilineTextAlignment(.center)
-                    .foregroundStyle(.secondary)
-            }
+            Text("You're in")
+                .font(.largeTitle.bold())
+            Text("Return to your app. It's unlocked for \(pluralMinutes(SharedStore.shared.durationMinutes)) of use, then locks itself.")
+                .multilineTextAlignment(.center)
+                .foregroundStyle(.secondary)
             Spacer()
             Button {
                 dismiss()
@@ -200,10 +189,6 @@ struct CaptureView: View {
 
     private func grant() {
         faceCheck.stop()
-        guard let target else {
-            phase = .granted
-            return
-        }
         // Screen Time calls are cross-process and can block for seconds;
         // keep them off the main thread so the UI stays responsive.
         Task.detached(priority: .userInitiated) {

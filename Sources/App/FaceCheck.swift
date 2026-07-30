@@ -1,6 +1,5 @@
 import AVFoundation
 import Vision
-import UIKit
 
 // Live two-face verification. Pass requires `requiredFaces` faces, each large
 // enough to indicate physical presence, held for `holdDuration` of continuous
@@ -18,7 +17,7 @@ final class FaceCheck: NSObject, ObservableObject {
     // face or a photo held at a distance.
     static let minFaceExtent: CGFloat = 0.12
     static let holdDuration: TimeInterval = 1.5
-    // Minimum RMS deviation (meters) of a face region from its best-fit
+    // Minimum deviation (meters) of a face region from its best-fit
     // plane. A tilted screen has depth spread but is still planar; a real
     // face has a nose. Screens and photos land near sensor noise.
     static let minDepthResidual: Float = 0.004
@@ -37,7 +36,7 @@ final class FaceCheck: NSObject, ObservableObject {
     @Published var cameraUnavailable = false
     @Published var depthActive = false
     #if DEBUG
-    // Per-face plane residuals, for threshold tuning on device.
+    // Per-face depth metrics, for threshold tuning on device.
     @Published var debugDepthInfo = ""
     #endif
 
@@ -49,6 +48,10 @@ final class FaceCheck: NSObject, ObservableObject {
     private let processingQueue = DispatchQueue(label: "com.riverray.plusone.facecheck")
     private var isProcessing = false
     private var holdStart: Date?
+    // processingQueue's copy of `passed`. The published property is written on
+    // the main queue for the UI; frame callbacks read this one so no value
+    // crosses threads unsynchronized.
+    private var hasPassed = false
     // Face centers from the previous depth-path frame, for the drift gate.
     private var previousCenters: [CGPoint] = []
 
@@ -134,6 +137,7 @@ final class FaceCheck: NSObject, ObservableObject {
         let elapsed = holdStart.map { now.timeIntervalSince($0) } ?? 0
         let progress = min(1, elapsed / Self.holdDuration)
         let passed = elapsed >= Self.holdDuration
+        if passed { hasPassed = true }
 
         DispatchQueue.main.async {
             self.validFaceCount = validCount
@@ -212,7 +216,7 @@ final class FaceCheck: NSObject, ObservableObject {
     // MARK: 2D path evaluation
 
     private func detect2D(in pixelBuffer: CVPixelBuffer, orientation: CGImagePropertyOrientation) {
-        guard !passed, !isProcessing else { return }
+        guard !hasPassed, !isProcessing else { return }
         isProcessing = true
 
         let request = VNDetectFaceRectanglesRequest { [weak self] request, _ in
@@ -233,10 +237,10 @@ final class FaceCheck: NSObject, ObservableObject {
     // MARK: Depth plane fit
 
     // Two liveness metrics for a face region, both in meters:
-    // - residual: RMS deviation from the best-fit plane. Separates a 3D face
-    //   from any flat surface at any tilt.
-    // - bump: mean depth of the periphery minus the center. Positive when the
-    //   region bulges toward the camera, as a nose does.
+    // - residual: robust deviation from the best-fit plane. Separates a 3D
+    //   face from any flat surface at any tilt.
+    // - bump: median depth of the periphery minus the center. Positive
+    //   when the region bulges toward the camera, as a nose does.
     // `normRect` is normalized with a top-left origin, matching buffer rows.
     private static func depthMetrics(in normRect: CGRect, depth: CVPixelBuffer) -> (residual: Float, bump: Float) {
         CVPixelBufferLockBaseAddress(depth, .readOnly)
@@ -348,7 +352,7 @@ final class FaceCheck: NSObject, ObservableObject {
 // Depth path: synchronized video + depth + face metadata.
 extension FaceCheck: AVCaptureDataOutputSynchronizerDelegate {
     func dataOutputSynchronizer(_ synchronizer: AVCaptureDataOutputSynchronizer, didOutput synchronizedDataCollection: AVCaptureSynchronizedDataCollection) {
-        guard !passed,
+        guard !hasPassed,
               let videoData = synchronizedDataCollection.synchronizedData(for: videoOutput) as? AVCaptureSynchronizedSampleBufferData,
               !videoData.sampleBufferWasDropped,
               let videoBuffer = CMSampleBufferGetImageBuffer(videoData.sampleBuffer),

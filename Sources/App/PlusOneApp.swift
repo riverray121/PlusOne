@@ -12,14 +12,14 @@ struct PlusOneApp: App {
             RootView()
                 .environmentObject(appState)
                 .onChange(of: scenePhase) { phase in
-                    // Foreground pass: expire lapsed sessions and surface any
-                    // unlock request written by the shield action extension.
-                    // refresh() opens the capture flow when a request exists.
+                    // Foreground pass: end lapsed sessions and clear expired
+                    // limits, then re-apply shields, since clearing an
+                    // exhausted limit changes what should be shielded.
+                    // refresh() surfaces an unlock request written by the
+                    // shield action extension.
                     if phase == .active {
                         SessionManager.shared.endExpiredSessions()
                         TimeLimitManager.shared.clearLapsedExhausted()
-                        // Settings changed in older builds can leave stale
-                        // store state; re-assert current policy.
                         SessionManager.shared.refreshShields()
                         appState.refresh()
                     }
@@ -36,26 +36,15 @@ struct RootView: View {
 
     var body: some View {
         Group {
-            #if LITE
-            // Lite build: no Screen Time, so onboarding has nothing to set up.
-            HomeView()
-            #else
             if appState.onboarded {
                 HomeView()
             } else {
                 OnboardingView()
             }
-            #endif
         }
-        #if LITE
-        .sheet(isPresented: $appState.showCapture) {
-            CaptureView(target: nil)
-        }
-        #else
         .sheet(item: $appState.captureRequest, onDismiss: { appState.captureDidDismiss() }) { request in
             CaptureView(target: request.target)
         }
-        #endif
     }
 }
 
@@ -64,10 +53,10 @@ extension Notification.Name {
 }
 
 // Routes unlock-notification taps into the capture flow.
-class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
+final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
     func application(
         _ application: UIApplication,
-        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
+        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
     ) -> Bool {
         UNUserNotificationCenter.current().delegate = self
         return true

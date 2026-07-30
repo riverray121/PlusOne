@@ -31,8 +31,6 @@ final class AppState: ObservableObject {
     }
     @Published var pendingUnlock: UnlockTarget?
     @Published var activeSessions: [UnlockSession] = []
-    // Lite build only: presents the demo capture sheet.
-    @Published var showCapture = false
     // One capture flow per unlock request; sheet identity is tied to it so a
     // new request always gets a fresh view with fresh state.
     @Published var captureRequest: CaptureRequest?
@@ -66,10 +64,8 @@ final class AppState: ObservableObject {
         activeSessions = store.activeSessions
     }
 
-    var blockedItemCount: Int {
-        selection.applicationTokens.count
-            + selection.webDomainTokens.count
-            + selection.categoryTokens.count
+    var selfieBlockItemCount: Int {
+        selection.itemCount
     }
 }
 

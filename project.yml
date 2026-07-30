@@ -1,6 +1,5 @@
 name: PlusOne
 options:
-  bundleIdPrefix: com.riverray
   deploymentTarget:
     iOS: "16.0"
   createIntermediateGroups: true
@@ -8,7 +7,8 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.9"
-    # Personal project: automatic signing; team is selected in Xcode on first device run.
+    # Automatic signing; the team is pinned here because regenerating the project
+    # from this spec discards any selection made in Xcode.
     CODE_SIGN_STYLE: Automatic
     DEVELOPMENT_TEAM: 76DJ96729W
     CURRENT_PROJECT_VERSION: 1
@@ -35,6 +35,8 @@ targets:
       path: Info/PlusOne-Info.plist
       properties:
         CFBundleDisplayName: PlusOne
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         UILaunchScreen: {}
         NSCameraUsageDescription: "The camera verifies two people are present before unlocking a blocked app. Frames are analyzed on-device and never stored."
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
@@ -42,28 +44,6 @@ targets:
       - target: ShieldUIExtension
       - target: ShieldActionExtension
       - target: MonitorExtension
-
-  # Temporary: entitlement-free build for camera testing on a free Personal
-  # Team. No Screen Time, no App Group, no extensions. Remove once the paid
-  # membership is active.
-  PlusOneLite:
-    type: application
-    platform: iOS
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.riverray.PlusOneLite
-        SWIFT_ACTIVE_COMPILATION_CONDITIONS: "LITE $(inherited)"
-    sources:
-      - Sources/App
-      - Sources/Shared
-      - Resources
-    info:
-      path: Info/PlusOneLite-Info.plist
-      properties:
-        CFBundleDisplayName: PlusOne Lite
-        UILaunchScreen: {}
-        NSCameraUsageDescription: "The camera verifies two people are present before unlocking a blocked app. Frames are analyzed on-device and never stored."
-        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
 
   ShieldUIExtension:
     type: app-extension
@@ -86,6 +66,8 @@ targets:
       path: Info/ShieldUIExtension-Info.plist
       properties:
         CFBundleDisplayName: PlusOne Shield
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         CFBundleIcons:
           CFBundlePrimaryIcon:
             CFBundleIconFiles: [NotificationIcon]
@@ -114,6 +96,8 @@ targets:
       path: Info/ShieldActionExtension-Info.plist
       properties:
         CFBundleDisplayName: PlusOne Shield Action
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         CFBundleIcons:
           CFBundlePrimaryIcon:
             CFBundleIconFiles: [NotificationIcon]
@@ -142,6 +126,8 @@ targets:
       path: Info/MonitorExtension-Info.plist
       properties:
         CFBundleDisplayName: PlusOne Monitor
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         CFBundleIcons:
           CFBundlePrimaryIcon:
             CFBundleIconFiles: [NotificationIcon]
@@ -158,9 +144,3 @@ schemes:
       config: Debug
     archive:
       config: Release
-  PlusOneLite:
-    build:
-      targets:
-        PlusOneLite: all
-    run:
-      config: Debug

@@ -23,7 +23,7 @@ struct TimeLimitRule: Codable, Identifiable, Equatable {
 
     init() {}
 
-    // warnMinutes is decoded leniently so rules stored before it existed
+    // warnMinutes is decoded leniently so rules persisted without the key
     // still load.
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -39,9 +39,7 @@ struct TimeLimitRule: Codable, Identifiable, Equatable {
     }
 
     var itemCount: Int {
-        selection.applicationTokens.count
-            + selection.webDomainTokens.count
-            + selection.categoryTokens.count
+        selection.itemCount
     }
 
     // Periods are calendar windows, not rolling: the budget resets at the top

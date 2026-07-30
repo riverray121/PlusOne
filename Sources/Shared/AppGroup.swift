@@ -1,4 +1,5 @@
 import Foundation
+import FamilyControls
 
 // Identifiers shared by the app and all extensions.
 enum AppGroup {
@@ -25,4 +26,15 @@ enum AppGroup {
 // "1 minute" / "5 minutes"
 func pluralMinutes(_ n: Int) -> String {
     n == 1 ? "1 minute" : "\(n) minutes"
+}
+
+// "1 item" / "5 items"
+func pluralItems(_ n: Int) -> String {
+    n == 1 ? "1 item" : "\(n) items"
+}
+
+extension FamilyActivitySelection {
+    var itemCount: Int {
+        applicationTokens.count + webDomainTokens.count + categoryTokens.count
+    }
 }

@@ -18,10 +18,8 @@ struct OnboardingView: View {
         NavigationStack {
             List {
                 Section {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("PlusOne blocks the apps you choose. To get in, take a selfie with someone; two faces buy you a timed session.")
-                    }
-                    .padding(.vertical, 4)
+                    Text("PlusOne blocks the apps you choose. To get in, take a selfie with someone; two faces buy you a timed session.")
+                        .padding(.vertical, 4)
                 }
 
                 Section("Permissions") {
@@ -54,9 +52,9 @@ struct OnboardingView: View {
                         showPicker = true
                     } label: {
                         Label(
-                            appState.blockedItemCount == 0
+                            appState.selfieBlockItemCount == 0
                                 ? "Choose apps and websites to block"
-                                : "\(appState.blockedItemCount) item(s) selected",
+                                : "\(pluralItems(appState.selfieBlockItemCount)) selected",
                             systemImage: "list.bullet"
                         )
                     }
@@ -76,7 +74,7 @@ struct OnboardingView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .listRowBackground(Color.clear)
-                    .disabled(!screenTimeGranted || appState.blockedItemCount == 0)
+                    .disabled(!screenTimeGranted || appState.selfieBlockItemCount == 0)
                 }
             }
             .navigationTitle("Welcome")

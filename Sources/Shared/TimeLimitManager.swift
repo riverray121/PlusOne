@@ -10,6 +10,8 @@ struct TimeLimitManager {
     static let shared = TimeLimitManager()
 
     private let store = SharedStore.shared
+    // stopMonitoring with an empty array stops every activity, so call sites
+    // check their list for emptiness first.
     private let center = DeviceActivityCenter()
 
     static let limitEvent = DeviceActivityEvent.Name("limit")
@@ -34,14 +36,14 @@ struct TimeLimitManager {
     // minutes already counted this period.
     func syncMonitoring() {
         let rules = store.timeLimitRules
-        let armed = store.armedLimits
-        let armedById = Dictionary(uniqueKeysWithValues: (armed?.rules ?? []).map { ($0.id, $0) })
+        let armed = store.armedLimits?.rules ?? []
+        let armedById = Dictionary(uniqueKeysWithValues: armed.map { ($0.id, $0) })
 
         let currentIds = Set(rules.map(\.id))
-        let removed = (armed?.rules ?? []).filter { !currentIds.contains($0.id) }
+        let removed = armed.filter { !currentIds.contains($0.id) }
         if !removed.isEmpty {
             center.stopMonitoring(removed.map { activity(for: $0) })
-            removed.forEach { clearExhausted($0.id) }
+            for rule in removed { clearExhausted(rule.id) }
         }
 
         for rule in rules {
@@ -128,8 +130,9 @@ struct TimeLimitManager {
 
     // Foreground backstop for a period reset the monitor extension missed.
     func clearLapsedExhausted(now: Date = Date()) {
-        let live = store.exhaustedLimits.filter { $0.value > now }
-        if live.count != store.exhaustedLimits.count {
+        let exhausted = store.exhaustedLimits
+        let live = exhausted.filter { $0.value > now }
+        if live.count != exhausted.count {
             store.exhaustedLimits = live
         }
     }

@@ -1,5 +1,4 @@
 import DeviceActivity
-import ManagedSettings
 
 // Ends unlock sessions and enforces time-limit rules from outside the app.
 // For sessions, the usage threshold is the real limit and interval end is the
@@ -15,6 +14,7 @@ class SessionMonitor: DeviceActivityMonitor {
     }
 
     override func intervalDidStart(for activity: DeviceActivityName) {
+        super.intervalDidStart(for: activity)
         if let ruleId = TimeLimitManager.ruleId(from: activity) {
             TimeLimitManager.shared.clearExhausted(ruleId)
             SessionManager.shared.refreshShields()
@@ -22,6 +22,7 @@ class SessionMonitor: DeviceActivityMonitor {
     }
 
     override func eventDidReachThreshold(_ event: DeviceActivityEvent.Name, activity: DeviceActivityName) {
+        super.eventDidReachThreshold(event, activity: activity)
         if let ruleId = TimeLimitManager.ruleId(from: activity) {
             switch event {
             case TimeLimitManager.limitEvent:
@@ -43,11 +44,10 @@ class SessionMonitor: DeviceActivityMonitor {
         guard let id = sessionId(from: activity) else { return }
         switch event.rawValue {
         case AppGroup.sessionWarnEventName:
-            let left = SharedStore.shared.sessionWarnMinutes
             Notifier.post(
                 id: AppGroup.sessionWarningNotificationId,
                 title: "Session ending soon",
-                body: "You have \(pluralMinutes(left)) left on this unlock."
+                body: "You have \(pluralMinutes(SharedStore.shared.sessionWarnMinutes)) left on this unlock."
             )
         case AppGroup.usageEventName:
             SessionManager.shared.endSession(id: id)
@@ -57,6 +57,7 @@ class SessionMonitor: DeviceActivityMonitor {
     }
 
     override func intervalDidEnd(for activity: DeviceActivityName) {
+        super.intervalDidEnd(for: activity)
         if let ruleId = TimeLimitManager.ruleId(from: activity) {
             TimeLimitManager.shared.clearExhausted(ruleId)
             SessionManager.shared.refreshShields()

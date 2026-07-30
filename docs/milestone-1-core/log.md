@@ -28,7 +28,6 @@ Development context for resuming work. Keep entries to one line. Not a changelog
 - Capture flow is driven by sheet(item:) with a per-request CaptureRequest id; view phases are an explicit enum. Grant no longer collides with pendingUnlock clearing.
 - Sessions are concurrent (one per item, DeviceActivity name "unlockSession-<uuid>"); gateCheck only refuses a target that is already unlocked.
 - Free Personal Teams do not support Family Controls at all; paid membership renewal in progress. Device registration list is also full until membership is active.
-- PlusOneLite target (temporary): entitlement-free, runs on free team and on Mac; remove after device testing.
 - DeviceActivity rejects schedules under 15 minutes, so the session limit is a usage threshold event (true "minutes of use"); interval end at max(15, duration+1) min and a foreground expiry check are backstops.
 - Extension targets are named *Extension to avoid colliding with ManagedSettings type names (ShieldAction).
 - Extension bundle IDs must be prefixed by the app's bundle ID; set explicitly in project.yml.

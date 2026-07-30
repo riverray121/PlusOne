@@ -29,18 +29,26 @@ struct SharedStore {
         static let lastSessionEnd = "lastSessionEnd"
     }
 
+    // Codable values are stored as JSON. A missing or unreadable value reads
+    // as nil, and writing nil clears the key.
+    private func decoded<T: Decodable>(_ key: String) -> T? {
+        guard let data = defaults.data(forKey: key) else { return nil }
+        return try? decoder.decode(T.self, from: data)
+    }
+
+    private func encode<T: Encodable>(_ value: T?, forKey key: String) {
+        guard let value else {
+            defaults.removeObject(forKey: key)
+            return
+        }
+        defaults.set(try? encoder.encode(value), forKey: key)
+    }
+
     // MARK: Selection
 
     var selection: FamilyActivitySelection {
-        get {
-            guard let data = defaults.data(forKey: Key.selection),
-                  let value = try? decoder.decode(FamilyActivitySelection.self, from: data)
-            else { return FamilyActivitySelection() }
-            return value
-        }
-        nonmutating set {
-            defaults.set(try? encoder.encode(newValue), forKey: Key.selection)
-        }
+        get { decoded(Key.selection) ?? FamilyActivitySelection() }
+        nonmutating set { encode(newValue, forKey: Key.selection) }
     }
 
     var protectionEnabled: Bool {
@@ -52,7 +60,7 @@ struct SharedStore {
 
     // Minutes of usage granted per pass.
     var durationMinutes: Int {
-        get { max(1, defaults.object(forKey: Key.durationMinutes) as? Int ?? 5) }
+        get { defaults.object(forKey: Key.durationMinutes) as? Int ?? 5 }
         nonmutating set { defaults.set(newValue, forKey: Key.durationMinutes) }
     }
 
@@ -85,81 +93,41 @@ struct SharedStore {
     // Second picker selection: hard-blocked items. Always shielded, and the
     // shield offers no unlock.
     var hardSelection: FamilyActivitySelection {
-        get {
-            guard let data = defaults.data(forKey: Key.hardSelection),
-                  let value = try? decoder.decode(FamilyActivitySelection.self, from: data)
-            else { return FamilyActivitySelection() }
-            return value
-        }
-        nonmutating set {
-            defaults.set(try? encoder.encode(newValue), forKey: Key.hardSelection)
-        }
+        get { decoded(Key.hardSelection) ?? FamilyActivitySelection() }
+        nonmutating set { encode(newValue, forKey: Key.hardSelection) }
     }
 
     // MARK: Time limits
 
     var timeLimitRules: [TimeLimitRule] {
-        get {
-            guard let data = defaults.data(forKey: Key.timeLimitRules) else { return [] }
-            return (try? decoder.decode([TimeLimitRule].self, from: data)) ?? []
-        }
-        nonmutating set {
-            defaults.set(try? encoder.encode(newValue), forKey: Key.timeLimitRules)
-        }
+        get { decoded(Key.timeLimitRules) ?? [] }
+        nonmutating set { encode(newValue, forKey: Key.timeLimitRules) }
     }
 
     // Rules whose budget is spent this period, keyed by rule id, with the
     // wall-clock reset time as a backstop for a missed period-start callback.
     var exhaustedLimits: [String: Date] {
-        get {
-            guard let data = defaults.data(forKey: Key.exhaustedLimits) else { return [:] }
-            return (try? decoder.decode([String: Date].self, from: data)) ?? [:]
-        }
-        nonmutating set {
-            defaults.set(try? encoder.encode(newValue), forKey: Key.exhaustedLimits)
-        }
+        get { decoded(Key.exhaustedLimits) ?? [:] }
+        nonmutating set { encode(newValue, forKey: Key.exhaustedLimits) }
     }
 
     var armedLimits: ArmedLimits? {
-        get {
-            guard let data = defaults.data(forKey: Key.armedLimits) else { return nil }
-            return try? decoder.decode(ArmedLimits.self, from: data)
-        }
-        nonmutating set {
-            if let newValue {
-                defaults.set(try? encoder.encode(newValue), forKey: Key.armedLimits)
-            } else {
-                defaults.removeObject(forKey: Key.armedLimits)
-            }
-        }
+        get { decoded(Key.armedLimits) }
+        nonmutating set { encode(newValue, forKey: Key.armedLimits) }
     }
 
     // MARK: Unlock flow state
 
     // Written by the shield action extension; consumed by the app's capture flow.
     var pendingUnlock: UnlockTarget? {
-        get {
-            guard let data = defaults.data(forKey: Key.pendingUnlock) else { return nil }
-            return try? decoder.decode(UnlockTarget.self, from: data)
-        }
-        nonmutating set {
-            if let newValue {
-                defaults.set(try? encoder.encode(newValue), forKey: Key.pendingUnlock)
-            } else {
-                defaults.removeObject(forKey: Key.pendingUnlock)
-            }
-        }
+        get { decoded(Key.pendingUnlock) }
+        nonmutating set { encode(newValue, forKey: Key.pendingUnlock) }
     }
 
     // Concurrent sessions: one per unlocked item, each with its own timer.
     var activeSessions: [UnlockSession] {
-        get {
-            guard let data = defaults.data(forKey: Key.activeSessions) else { return [] }
-            return (try? decoder.decode([UnlockSession].self, from: data)) ?? []
-        }
-        nonmutating set {
-            defaults.set(try? encoder.encode(newValue), forKey: Key.activeSessions)
-        }
+        get { decoded(Key.activeSessions) ?? [] }
+        nonmutating set { encode(newValue, forKey: Key.activeSessions) }
     }
 
     var lastSessionEnd: Date? {
@@ -184,8 +152,8 @@ struct SharedStore {
     }
 
     private static func dayString(_ date: Date) -> String {
-        let c = Calendar.current.dateComponents([.year, .month, .day], from: date)
-        return "\(c.year!)-\(c.month!)-\(c.day!)"
+        let components = Calendar.current.dateComponents([.year, .month, .day], from: date)
+        return "\(components.year!)-\(components.month!)-\(components.day!)"
     }
 }
 

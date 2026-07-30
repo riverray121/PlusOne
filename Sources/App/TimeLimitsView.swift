@@ -37,10 +37,6 @@ struct TimeLimitsView: View {
         .navigationTitle("Time limits")
     }
 
-    private func pluralItems(_ n: Int) -> String {
-        n == 1 ? "1 item" : "\(n) items"
-    }
-
     private func save(_ saved: TimeLimitRule) {
         if let index = rules.firstIndex(where: { $0.id == saved.id }) {
             rules[index] = saved
@@ -79,7 +75,7 @@ struct TimeLimitEditView: View {
     private let warnOptions = [0, 1, 2, 5, 10]
 
     var body: some View {
-        Form {
+        List {
             // The rule is local until Save, so commit needs no extra work.
             SelectionEditor(
                 selection: $rule.selection,

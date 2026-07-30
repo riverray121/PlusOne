@@ -12,8 +12,8 @@ struct SessionManager {
     private let store = SharedStore.shared
     private let center = DeviceActivityCenter()
 
-    private var usageEvent: DeviceActivityEvent.Name { .init(AppGroup.usageEventName) }
-    private var warnEvent: DeviceActivityEvent.Name { .init(AppGroup.sessionWarnEventName) }
+    private static let usageEvent = DeviceActivityEvent.Name(AppGroup.usageEventName)
+    private static let warnEvent = DeviceActivityEvent.Name(AppGroup.sessionWarnEventName)
 
     private func activity(for id: String) -> DeviceActivityName {
         .init("\(AppGroup.activityName)-\(id)")
@@ -32,9 +32,9 @@ struct SessionManager {
 
     // MARK: Gates
 
-    func gateCheck(for target: UnlockTarget?, now: Date = Date()) -> GateResult {
+    func gateCheck(for target: UnlockTarget, now: Date = Date()) -> GateResult {
         let sessions = store.activeSessions.filter { $0.wallClockEnd > now }
-        if let target, sessions.contains(where: { $0.target == target }) {
+        if sessions.contains(where: { $0.target == target }) {
             return .sessionActive
         }
         let cooldown = store.cooldownMinutes
@@ -74,7 +74,7 @@ struct SessionManager {
             repeats: false
         )
         var events: [DeviceActivityEvent.Name: DeviceActivityEvent] = [
-            usageEvent: DeviceActivityEvent(
+            Self.usageEvent: DeviceActivityEvent(
                 applications: apps,
                 categories: categories,
                 webDomains: domains,
@@ -83,7 +83,7 @@ struct SessionManager {
         ]
         let warn = store.sessionWarnMinutes
         if warn > 0, minutes - warn >= 1 {
-            events[warnEvent] = DeviceActivityEvent(
+            events[Self.warnEvent] = DeviceActivityEvent(
                 applications: apps,
                 categories: categories,
                 webDomains: domains,
@@ -103,7 +103,7 @@ struct SessionManager {
         store.activeSessions = sessions
         store.pendingUnlock = nil
         store.incrementSessionsToday(now: now)
-        reapplyShields(now: now)
+        refreshShields(now: now)
     }
 
     // MARK: End
@@ -117,7 +117,7 @@ struct SessionManager {
         sessions.removeAll { $0.id == id }
         store.activeSessions = sessions
         store.lastSessionEnd = now
-        reapplyShields(now: now)
+        refreshShields(now: now)
     }
 
     // Foreground backstop: re-lock any session whose wall clock window lapsed
@@ -135,16 +135,12 @@ struct SessionManager {
         center.stopMonitoring(sessions.map { activity(for: $0.id) })
         store.activeSessions = []
         store.lastSessionEnd = now
-        reapplyShields(now: now)
+        refreshShields(now: now)
     }
 
-    // Re-applies shields after a blocklist edit, respecting live sessions.
+    // Shields everything except items with a live session. Callers re-apply
+    // after any edit that changes what should be shielded.
     func refreshShields(now: Date = Date()) {
-        reapplyShields(now: now)
-    }
-
-    // Shields everything except items with a live session.
-    private func reapplyShields(now: Date) {
         guard store.protectionEnabled else { return }
         let unlocked = store.activeSessions
             .filter { $0.wallClockEnd > now }
