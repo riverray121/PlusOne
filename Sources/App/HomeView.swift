@@ -3,8 +3,6 @@ import FamilyControls
 
 struct HomeView: View {
     @EnvironmentObject private var appState: AppState
-    @State private var showPicker = false
-    @State private var showSettings = false
 
     var body: some View {
         NavigationStack {
@@ -20,17 +18,6 @@ struct HomeView: View {
                 #endif
             }
             .navigationTitle("PlusOne")
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        showSettings = true
-                    } label: {
-                        Image(systemName: "gearshape")
-                    }
-                }
-            }
-            .sheet(isPresented: $showSettings) { SettingsView() }
-            .familyActivityPicker(isPresented: $showPicker, selection: $appState.selection)
         }
     }
 
@@ -93,8 +80,8 @@ struct HomeView: View {
 
     private var blockedListSection: some View {
         Section {
-            Button {
-                showPicker = true
+            NavigationLink {
+                SelfieBlockView()
             } label: {
                 HStack {
                     Label("Selfie-unlock blocks", systemImage: "person.2.fill")
@@ -103,7 +90,6 @@ struct HomeView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            .foregroundStyle(.primary)
 
             NavigationLink {
                 HardBlockView()
