@@ -14,6 +14,8 @@ Development context for resuming work. Keep entries to one line. Not a changelog
 - [ ] On-device verification of all Screen Time paths (shield, unlock hop, re-lock).
 
 ## Notes
+- Time limits: one repeating DeviceActivity per rule (hourly window minute 0-59, daily 00:00-23:59) with a "limit" threshold event and an optional "warn" event at limit minus warnMinutesLeft. Threshold usage counts from startMonitoring, so TimeLimitManager.syncMonitoring diffs against an armed snapshot and restarts only changed rules.
+- Spent rules live in SharedStore.exhaustedLimits (rule id -> wall-clock reset) written by the monitor extension; they shield like hard blocks (after session exclusions). intervalDidStart clears them; foreground clearLapsedExhausted is the backstop.
 - iOS web filter has NO pure blocklist mode: any blockedByFilter policy (.specific included) implies the adult filter, and it disables Safari private browsing. So webContent serves only the adult toggle (.auto on, explicit FilterPolicy.none off; bare .none resolves to Optional nil = remove, which can leave the filter stuck).
 - Hard blocks are a second FamilyActivitySelection (hardSelection), always shielded, excluded from session exceptions; shield extensions render a no-unlock variant by token membership.
 - Website blocklist: string domains (presets + custom) enforced via webContent.blockedByFilter. Tokens are opaque so app->domain pairing cannot be automatic. Safari shows its own restricted page; unlocks start from Home. String-domain sessions have no usage threshold: wall-clock re-lock at >= 15 min plus foreground backstop.

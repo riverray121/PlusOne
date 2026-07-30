@@ -13,6 +13,9 @@ enum AppGroup {
 
     // Notification posted by the shield action to route the user into the app.
     static let unlockNotificationId = "com.riverray.plusone.unlock"
+
+    // Notification posted by the monitor when a time limit is nearly spent.
+    static let limitWarningNotificationId = "com.riverray.plusone.limitWarning"
 }
 
 // "1 minute" / "5 minutes"

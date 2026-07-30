@@ -21,8 +21,10 @@ final class AppState: ObservableObject {
             store.protectionEnabled = protectionEnabled
             if protectionEnabled {
                 ShieldController.shared.applyShields()
+                TimeLimitManager.shared.syncMonitoring()
             } else {
                 SessionManager.shared.endAllSessions()
+                TimeLimitManager.shared.stopAll()
                 ShieldController.shared.clearShields()
             }
         }

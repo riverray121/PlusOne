@@ -115,11 +115,27 @@ struct HomeView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+
+            NavigationLink {
+                TimeLimitsView()
+            } label: {
+                HStack {
+                    Label("Time limits", systemImage: "hourglass")
+                    Spacer()
+                    Text(timeLimitSummary)
+                        .foregroundStyle(.secondary)
+                }
+            }
         } header: {
             Text("Blocking")
         } footer: {
-            Text("Selfie-unlock blocks open after a selfie with at least two people. Hard blocks never open.")
+            Text("Selfie-unlock blocks open after a selfie with at least two people. Hard blocks never open. Time limits grant a budget of minutes per hour or day.")
         }
+    }
+
+    private var timeLimitSummary: String {
+        let count = SharedStore.shared.timeLimitRules.count
+        return count == 0 ? "Off" : (count == 1 ? "1 limit" : "\(count) limits")
     }
 
     private var hardBlockSummary: String {

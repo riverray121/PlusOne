@@ -18,6 +18,10 @@ struct SharedStore {
         static let dailyCap = "dailyCap"
         static let adultFilter = "adultFilter"
         static let hardSelection = "hardSelection"
+        static let timeLimitRules = "timeLimitRules"
+        static let exhaustedLimits = "exhaustedLimits"
+        static let warnMinutesLeft = "warnMinutesLeft"
+        static let armedLimits = "armedLimits"
         static let pendingUnlock = "pendingUnlock"
         static let activeSessions = "activeSessions"
         static let sessionsToday = "sessionsToday"
@@ -82,6 +86,50 @@ struct SharedStore {
         }
         nonmutating set {
             defaults.set(try? encoder.encode(newValue), forKey: Key.hardSelection)
+        }
+    }
+
+    // MARK: Time limits
+
+    var timeLimitRules: [TimeLimitRule] {
+        get {
+            guard let data = defaults.data(forKey: Key.timeLimitRules) else { return [] }
+            return (try? decoder.decode([TimeLimitRule].self, from: data)) ?? []
+        }
+        nonmutating set {
+            defaults.set(try? encoder.encode(newValue), forKey: Key.timeLimitRules)
+        }
+    }
+
+    // Rules whose budget is spent this period, keyed by rule id, with the
+    // wall-clock reset time as a backstop for a missed period-start callback.
+    var exhaustedLimits: [String: Date] {
+        get {
+            guard let data = defaults.data(forKey: Key.exhaustedLimits) else { return [:] }
+            return (try? decoder.decode([String: Date].self, from: data)) ?? [:]
+        }
+        nonmutating set {
+            defaults.set(try? encoder.encode(newValue), forKey: Key.exhaustedLimits)
+        }
+    }
+
+    // Minutes-remaining mark for the limit warning notification. 0 = off.
+    var warnMinutesLeft: Int {
+        get { defaults.object(forKey: Key.warnMinutesLeft) as? Int ?? 1 }
+        nonmutating set { defaults.set(newValue, forKey: Key.warnMinutesLeft) }
+    }
+
+    var armedLimits: ArmedLimits? {
+        get {
+            guard let data = defaults.data(forKey: Key.armedLimits) else { return nil }
+            return try? decoder.decode(ArmedLimits.self, from: data)
+        }
+        nonmutating set {
+            if let newValue {
+                defaults.set(try? encoder.encode(newValue), forKey: Key.armedLimits)
+            } else {
+                defaults.removeObject(forKey: Key.armedLimits)
+            }
         }
     }
 

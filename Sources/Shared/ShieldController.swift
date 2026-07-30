@@ -42,6 +42,16 @@ struct ShieldController {
         exceptApps.subtract(hard.applicationTokens)
         exceptDomains.subtract(hard.webDomainTokens)
 
+        // Spent time-limit rules shield the same way until their period
+        // resets: no session can unshield them either.
+        for rule in TimeLimitManager.shared.exhaustedRules {
+            apps.formUnion(rule.selection.applicationTokens)
+            domains.formUnion(rule.selection.webDomainTokens)
+            categories.formUnion(rule.selection.categoryTokens)
+            exceptApps.subtract(rule.selection.applicationTokens)
+            exceptDomains.subtract(rule.selection.webDomainTokens)
+        }
+
         store.shield.applications = apps.isEmpty ? nil : apps
         store.shield.webDomains = domains.isEmpty ? nil : domains
         store.shield.applicationCategories = categories.isEmpty
