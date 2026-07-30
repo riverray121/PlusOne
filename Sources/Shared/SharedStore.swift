@@ -20,7 +20,6 @@ struct SharedStore {
         static let hardSelection = "hardSelection"
         static let timeLimitRules = "timeLimitRules"
         static let exhaustedLimits = "exhaustedLimits"
-        static let warnMinutesLeft = "warnMinutesLeft"
         static let sessionWarnMinutes = "sessionWarnMinutes"
         static let armedLimits = "armedLimits"
         static let pendingUnlock = "pendingUnlock"
@@ -119,12 +118,6 @@ struct SharedStore {
         nonmutating set {
             defaults.set(try? encoder.encode(newValue), forKey: Key.exhaustedLimits)
         }
-    }
-
-    // Minutes-remaining mark for the limit warning notification. 0 = off.
-    var warnMinutesLeft: Int {
-        get { defaults.object(forKey: Key.warnMinutesLeft) as? Int ?? 1 }
-        nonmutating set { defaults.set(newValue, forKey: Key.warnMinutesLeft) }
     }
 
     var armedLimits: ArmedLimits? {

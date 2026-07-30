@@ -34,7 +34,6 @@ struct TimeLimitManager {
     // minutes already counted this period.
     func syncMonitoring() {
         let rules = store.timeLimitRules
-        let warn = store.warnMinutesLeft
         let armed = store.armedLimits
         let armedById = Dictionary(uniqueKeysWithValues: (armed?.rules ?? []).map { ($0.id, $0) })
 
@@ -45,19 +44,18 @@ struct TimeLimitManager {
             removed.forEach { clearExhausted($0.id) }
         }
 
-        let warnChanged = armed.map { $0.warn != warn } ?? true
         for rule in rules {
-            if !warnChanged, armedById[rule.id] == rule { continue }
+            if armedById[rule.id] == rule { continue }
             center.stopMonitoring([activity(for: rule)])
             clearExhausted(rule.id)
             try? center.startMonitoring(
                 activity(for: rule),
                 during: schedule(for: rule.period),
-                events: events(for: rule, warn: warn)
+                events: events(for: rule)
             )
         }
 
-        store.armedLimits = ArmedLimits(rules: rules, warn: warn)
+        store.armedLimits = ArmedLimits(rules: rules)
     }
 
     // Protection toggled off: stop counting and forget spent state.
@@ -89,7 +87,7 @@ struct TimeLimitManager {
 
     // Both thresholds ride on one activity, so a warning costs no extra slot
     // against the system's monitored-activity cap.
-    private func events(for rule: TimeLimitRule, warn: Int) -> [DeviceActivityEvent.Name: DeviceActivityEvent] {
+    private func events(for rule: TimeLimitRule) -> [DeviceActivityEvent.Name: DeviceActivityEvent] {
         var events: [DeviceActivityEvent.Name: DeviceActivityEvent] = [
             Self.limitEvent: DeviceActivityEvent(
                 applications: rule.selection.applicationTokens,
@@ -98,12 +96,12 @@ struct TimeLimitManager {
                 threshold: DateComponents(minute: rule.minutes)
             )
         ]
-        if warn > 0, rule.minutes - warn >= 1 {
+        if rule.warnMinutes > 0, rule.minutes - rule.warnMinutes >= 1 {
             events[Self.warnEvent] = DeviceActivityEvent(
                 applications: rule.selection.applicationTokens,
                 categories: rule.selection.categoryTokens,
                 webDomains: rule.selection.webDomainTokens,
-                threshold: DateComponents(minute: rule.minutes - warn)
+                threshold: DateComponents(minute: rule.minutes - rule.warnMinutes)
             )
         }
         return events
@@ -161,5 +159,4 @@ struct TimeLimitManager {
 // against it so unchanged rules keep their counted usage.
 struct ArmedLimits: Codable, Equatable {
     var rules: [TimeLimitRule]
-    var warn: Int
 }

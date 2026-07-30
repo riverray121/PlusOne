@@ -14,6 +14,7 @@ Development context for resuming work. Keep entries to one line. Not a changelog
 - [ ] On-device verification of all Screen Time paths (shield, unlock hop, re-lock).
 
 ## Notes
+- FamilyActivityPicker must be presented from a pushed view or the root, never from inside a sheet: dismissing the picker also dismisses the presenting sheet, discarding unsaved edits.
 - Time limits: one repeating DeviceActivity per rule (hourly window minute 0-59, daily 00:00-23:59) with a "limit" threshold event and an optional "warn" event at limit minus warnMinutesLeft. Threshold usage counts from startMonitoring, so TimeLimitManager.syncMonitoring diffs against an armed snapshot and restarts only changed rules.
 - Spent rules live in SharedStore.exhaustedLimits (rule id -> wall-clock reset) written by the monitor extension; they shield like hard blocks (after session exclusions). intervalDidStart clears them; foreground clearLapsedExhausted is the backstop.
 - iOS pairs apps with their websites: shielding a WebDomainToken also restricts the associated native app (observed with instagram.com and youtube.com; Apple's own Screen Time website limits behave the same). The pairing lives in the OS and there is no API to opt out; tokens are opaque so the app cannot even detect the pairing. Blocking an ApplicationToken does NOT restrict the website, so the asymmetric setup (app blocked, site open) works but not the reverse.

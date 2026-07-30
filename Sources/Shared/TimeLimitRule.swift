@@ -18,6 +18,25 @@ struct TimeLimitRule: Codable, Identifiable, Equatable {
     var selection = FamilyActivitySelection()
     var minutes = 15
     var period = Period.day
+    // Minutes-remaining mark for this rule's warning notification. 0 = off.
+    var warnMinutes = 1
+
+    init() {}
+
+    // warnMinutes is decoded leniently so rules stored before it existed
+    // still load.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        selection = try container.decode(FamilyActivitySelection.self, forKey: .selection)
+        minutes = try container.decode(Int.self, forKey: .minutes)
+        period = try container.decode(Period.self, forKey: .period)
+        warnMinutes = try container.decodeIfPresent(Int.self, forKey: .warnMinutes) ?? 1
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, selection, minutes, period, warnMinutes
+    }
 
     var itemCount: Int {
         selection.applicationTokens.count

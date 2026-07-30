@@ -29,11 +29,10 @@ class SessionMonitor: DeviceActivityMonitor {
                 SessionManager.shared.refreshShields()
             case TimeLimitManager.warnEvent:
                 if let rule = TimeLimitManager.shared.rule(withId: ruleId) {
-                    let left = SharedStore.shared.warnMinutesLeft
                     Notifier.post(
                         id: AppGroup.limitWarningNotificationId,
                         title: "Time limit almost up",
-                        body: "You have \(pluralMinutes(left)) left of \(pluralMinutes(rule.minutes)) per \(rule.period.label)."
+                        body: "You have \(pluralMinutes(rule.warnMinutes)) left of \(pluralMinutes(rule.minutes)) per \(rule.period.label)."
                     )
                 }
             default:
