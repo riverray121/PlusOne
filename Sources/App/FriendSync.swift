@@ -1,5 +1,6 @@
 import Foundation
 import CloudKit
+import UIKit
 
 // CloudKit friend approval. Two roles, both possible on one device: owner
 // (this device's weakenings need the friend's approval) and companion (this
@@ -80,51 +81,75 @@ final class FriendSync: ObservableObject {
 
     // MARK: Owner: pairing
 
-    // Creates (or reuses) the zone and its zone-wide share for the sharing
-    // sheet. Pairing completes when the friend accepts.
+    // Returns the zone-wide share for the sharing sheet, creating the zone
+    // and share on first use. Fetch-first keeps the re-tap path to a single
+    // network call. fetchShare distinguishes "no share" from transient
+    // errors; a swallowed error here would attempt a duplicate share save.
+    // Owner state is untouched: a share with no participants has invited no
+    // one, so only the sheet's save callback advances it.
     func prepareShare() async throws -> CKShare {
-        _ = try await privateDB.modifyRecordZones(saving: [CKRecordZone(zoneID: zoneID)], deleting: [])
-        await ensureOwnerSubscription()
-        // fetchShare distinguishes "no share" from transient errors; a
-        // swallowed error here would attempt a duplicate share save.
+        await finishTeardown()
         if let existing = try await fetchShare() {
-            if ownerState == .none { setOwnerState(.invited) }
             return existing
         }
+        _ = try await privateDB.modifyRecordZones(saving: [CKRecordZone(zoneID: zoneID)], deleting: [])
         let share = CKShare(recordZoneID: zoneID)
         share[CKShare.SystemFieldKey.title] = Self.shareTitle as CKRecordValue
+        // Without a thumbnail the invitation renders with a generic
+        // document icon in Messages and the share sheet.
+        if let thumbnail = UIImage(named: "FriendInvite")?.pngData() {
+            share[CKShare.SystemFieldKey.thumbnailImageData] = thumbnail as CKRecordValue
+        }
         share.publicPermission = .none
         let (saveResults, _) = try await privateDB.modifyRecords(saving: [share], deleting: [])
         for (_, result) in saveResults {
             _ = try result.get()
         }
-        setOwnerState(.invited)
         return share
     }
 
-    // Invitation withdrawn before acceptance, or sharing stopped from the
-    // system share UI. Pre-pairing this is not a weakening; the gate is not
-    // involved.
-    func abandonShare() {
-        Task {
-            do {
-                try await teardownShare()
-            } catch {
-                lastError = error.localizedDescription
-            }
+    // The sharing sheet saved the invitation: the only path that sends
+    // anything to anyone.
+    func invitationSent() {
+        setOwnerState(.invited)
+        Task { await ensureOwnerSubscription() }
+    }
+
+    // Invitation withdrawn, sharing stopped from the system UI, unpair
+    // applied by the gate, or share revoked externally. Local state resets
+    // immediately so the UI never waits on the network; the remote zone
+    // deletion runs behind a flag and retries on later syncs if it fails.
+    func resetPairing() {
+        setOwnerState(.none)
+        setRequestedIDs([])
+        defaults.set(true, forKey: "teardownNeeded")
+        Task { await finishTeardown() }
+    }
+
+    // Deleting the zone removes the share and every request with it. A
+    // failure must never resurrect pairing state; it only lingers as cleanup
+    // work for the next sync.
+    private func finishTeardown() async {
+        guard defaults.bool(forKey: "teardownNeeded") else { return }
+        do {
+            _ = try await privateDB.modifyRecordZones(saving: [], deleting: [zoneID])
+            defaults.set(false, forKey: "teardownNeeded")
+        } catch {
+            lastError = error.localizedDescription
         }
     }
 
     // MARK: Owner: sync
 
     private func syncOwner() async {
+        await finishTeardown()
         do {
             switch ownerState {
             case .none:
                 break
             case .invited:
                 guard let share = try await fetchShare() else {
-                    setOwnerState(.none)
+                    resetPairing()
                     break
                 }
                 if share.participants.contains(where: { $0.role != .owner && $0.acceptanceStatus == .accepted }) {
@@ -135,15 +160,14 @@ final class FriendSync: ObservableObject {
             case .paired:
                 // Unpair applied by the gate: finish it in CloudKit.
                 if !SharedStore.shared.friendPaired {
-                    try await teardownShare()
+                    resetPairing()
                     break
                 }
                 guard try await fetchShare() != nil else {
                     // Share revoked outside the app: treat as unpaired.
                     // Queued approval-only changes stay queued; the user can
                     // cancel them, which is always allowed.
-                    setOwnerState(.none)
-                    setRequestedIDs([])
+                    resetPairing()
                     break
                 }
                 try await reconcileRequests()

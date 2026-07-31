@@ -13,19 +13,6 @@ struct AntiTamperView: View {
     var body: some View {
         List {
             Section {
-                Picker("Settings change delay", selection: $delay) {
-                    ForEach(delayOptions, id: \.self) { Text(delayHoursLabel($0)) }
-                }
-                .onChange(of: delay) { minutes in
-                    if !proposeOrNotify(.setDelay(minutes), into: $queued) {
-                        delay = SharedStore.shared.delayMinutes
-                    }
-                }
-            } footer: {
-                Text("Changes that weaken protection wait this long, with a countdown and cancel. Strengthening is always immediate.")
-            }
-
-            Section {
                 Toggle("Prevent app deletion", isOn: $deletePrevention)
                     .onChange(of: deletePrevention) { on in
                         if !proposeOrNotify(.setDeletePrevention(on), into: $queued) {
@@ -37,6 +24,15 @@ struct AntiTamperView: View {
             }
 
             Section {
+                Picker("Settings change delay", selection: $delay) {
+                    ForEach(delayOptions, id: \.self) { Text(delayHoursLabel($0)) }
+                }
+                .onChange(of: delay) { minutes in
+                    if !proposeOrNotify(.setDelay(minutes), into: $queued) {
+                        delay = SharedStore.shared.delayMinutes
+                    }
+                }
+
                 NavigationLink {
                     PendingChangesView()
                 } label: {
@@ -49,6 +45,8 @@ struct AntiTamperView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+            } footer: {
+                Text("Changes that weaken protection wait this long, with a countdown and cancel. Strengthening is always immediate.")
             }
 
             FriendPairingSection(queued: $queued)

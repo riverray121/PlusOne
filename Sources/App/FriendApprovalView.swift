@@ -8,6 +8,7 @@ struct FriendPairingSection: View {
     @ObservedObject private var friendSync = FriendSync.shared
     @Binding var queued: QueuedNotice?
     @State private var sharePresentation: SharePresentation?
+    @State private var isPreparing = false
 
     var body: some View {
         Section {
@@ -16,13 +17,23 @@ struct FriendPairingSection: View {
                 Button {
                     startPairing()
                 } label: {
-                    Label("Pair with a friend", systemImage: "person.badge.plus")
+                    if isPreparing {
+                        Label {
+                            Text("Preparing invitation")
+                        } icon: {
+                            ProgressView()
+                        }
+                    } else {
+                        Label("Pair with a friend", systemImage: "person.badge.plus")
+                    }
                 }
+                .disabled(isPreparing)
             case .invited:
-                Label("Invitation sent", systemImage: "paperplane")
+                Label("Invitation sent", systemImage: "person.2.wave.2")
                 Button("Show invitation again") { startPairing() }
+                    .disabled(isPreparing)
                 Button("Withdraw invitation", role: .destructive) {
-                    friendSync.abandonShare()
+                    friendSync.resetPairing()
                 }
             case .paired:
                 Label("Friend paired", systemImage: "person.2.fill")
@@ -47,8 +58,13 @@ struct FriendPairingSection: View {
         }
     }
 
+    // The guard and flag stop double-taps from racing two share creations;
+    // the spinner is the immediate feedback while CloudKit round-trips.
     private func startPairing() {
+        guard !isPreparing else { return }
+        isPreparing = true
         Task {
+            defer { isPreparing = false }
             do {
                 let share = try await friendSync.prepareShare()
                 sharePresentation = SharePresentation(share: share)
@@ -132,9 +148,17 @@ struct CloudSharingSheet: UIViewControllerRepresentable {
             }
         }
 
+        // The save callback is the only signal an invitation actually went
+        // out; cancelling the sheet fires neither delegate method.
+        func cloudSharingControllerDidSaveShare(_ csc: UICloudSharingController) {
+            Task { @MainActor in
+                FriendSync.shared.invitationSent()
+            }
+        }
+
         func cloudSharingControllerDidStopSharing(_ csc: UICloudSharingController) {
             Task { @MainActor in
-                FriendSync.shared.abandonShare()
+                FriendSync.shared.resetPairing()
             }
         }
     }
