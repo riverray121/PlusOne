@@ -22,7 +22,7 @@ struct AntiTamperView: View {
                     }
                 }
             } footer: {
-                Text("Any change that weakens protection (removing a blocked item, lengthening the unlock duration, turning protection off) waits this long before taking effect, with a visible countdown and one-tap cancel. Strengthening changes are always immediate.")
+                Text("Changes that weaken protection wait this long, with a countdown and cancel. Strengthening is always immediate.")
             }
 
             Section {
@@ -33,7 +33,7 @@ struct AntiTamperView: View {
                         }
                     }
             } footer: {
-                Text("Uses the OS app-removal restriction: no app on this device can be deleted, PlusOne included. The restriction is device-wide by iOS design. Turning it on is immediate; turning it off waits out the delay. Limitation: revoking PlusOne's Screen Time permission in the Settings app clears it, so have a friend set the device's Screen Time passcode.")
+                Text("No app on this device can be deleted while this is on, PlusOne included. Turning it off waits out the delay. Revoking PlusOne's Screen Time permission clears it.")
             }
 
             Section {

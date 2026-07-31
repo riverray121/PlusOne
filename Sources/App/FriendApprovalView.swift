@@ -39,7 +39,7 @@ struct FriendPairingSection: View {
         } header: {
             Text("Friend approval")
         } footer: {
-            Text("Weakening changes are sent to your paired friend; their approval applies a change immediately, their denial discards it, and an unanswered request falls back to the delay countdown. Requests travel through iCloud; both phones need PlusOne and a signed-in iCloud account. Only the requests and responses sync. Unpairing itself needs approval or the delay.")
+            Text("Weakening changes go to your friend: approved applies now, denied is discarded, unanswered falls back to the delay. Only requests and responses sync over iCloud.")
         }
         .sheet(item: $sharePresentation) { presentation in
             CloudSharingSheet(share: presentation.share)
@@ -89,7 +89,7 @@ struct FriendInboxSection: View {
             } header: {
                 Text("Approve for your friend")
             } footer: {
-                Text("Your friend wants to weaken their protection. Approving applies the change immediately; denying discards it.")
+                Text("Approving applies your friend's change immediately; denying discards it.")
             }
         }
     }
