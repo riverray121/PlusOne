@@ -57,7 +57,7 @@ struct PendingChangesView: View {
     private func countdown(_ change: PendingChange) -> some View {
         // One Date.now sample: the range below must not invert if the
         // deadline passes between a check and the range construction.
-        let now = Date.now
+        let now = Date()
         if let appliesAt = change.appliesAt {
             if appliesAt <= now {
                 Text("Applies on next launch")
@@ -71,8 +71,7 @@ struct PendingChangesView: View {
 }
 
 // Feedback that a weakening was queued instead of applied.
-struct QueuedNotice: Identifiable {
-    let id = UUID()
+struct QueuedNotice {
     let summary: String
     let appliesAt: Date?
 
@@ -86,6 +85,19 @@ struct QueuedNotice: Identifiable {
             return "\(summary): waiting for your friend's approval. Cancel anytime under Anti-tamper."
         }
         return "\(summary): applies \(appliesAt.formatted(date: .abbreviated, time: .shortened)) unless cancelled under Anti-tamper."
+    }
+}
+
+// Shared shape of every gated control: propose, and on queue surface the
+// notice. Returns whether the change applied, so callers can snap a picker
+// or toggle back to the stored value.
+func proposeOrNotify(_ kind: PendingChange.Kind, into queued: Binding<QueuedNotice?>) -> Bool {
+    switch ProtectionGate.shared.propose(kind) {
+    case .applied:
+        return true
+    case .queued(let change):
+        queued.wrappedValue = QueuedNotice(change)
+        return false
     }
 }
 

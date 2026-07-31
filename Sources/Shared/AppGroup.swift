@@ -23,15 +23,17 @@ enum AppGroup {
     static let sessionWarningNotificationId = "com.riverray.plusone.sessionWarning"
 }
 
-// "1 minute" / "5 minutes"
 func pluralMinutes(_ n: Int) -> String {
     n == 1 ? "1 minute" : "\(n) minutes"
 }
 
-// "1 item" / "5 items"
 func pluralItems(_ n: Int) -> String {
     n == 1 ? "1 item" : "\(n) items"
 }
+
+// Minutes-remaining choices for the session and time-limit warning pickers,
+// shared so the two warnings always offer the same marks. 0 = off.
+let warnMinuteOptions = [0, 1, 2, 5, 10]
 
 // "Off" / "1 hour" / "12 hours"
 func delayHoursLabel(_ minutes: Int) -> String {

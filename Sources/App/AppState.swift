@@ -1,8 +1,8 @@
 import SwiftUI
 import FamilyControls
 
-// Observable mirror of SharedStore for the UI. All mutations flow through
-// here so shields stay consistent with persisted state.
+// Observable mirror of the SharedStore state the UI binds to. Assigning
+// selection persists it and re-shields, so views never write it directly.
 @MainActor
 final class AppState: ObservableObject {
     private let store = SharedStore.shared

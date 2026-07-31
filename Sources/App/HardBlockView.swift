@@ -17,24 +17,17 @@ struct HardBlockView: View {
                 selection: $hardSelection,
                 footer: "Hard-blocked items show a block screen with no unlock button. Swipe an item left to remove it.",
                 removal: { removed in
-                    switch ProtectionGate.shared.propose(.removeHardItems(removed)) {
-                    case .applied:
-                        return true
-                    case .queued(let change):
-                        queued = QueuedNotice(change)
-                        return false
-                    }
+                    proposeOrNotify(.removeHardItems(removed), into: $queued)
                 }
             ) { newValue in
                 SharedStore.shared.hardSelection = newValue
-                applyNow()
+                SessionManager.shared.refreshShields()
             }
 
             Section {
                 Toggle("Block adult websites", isOn: $adultFilter)
                     .onChange(of: adultFilter) { on in
-                        if case .queued(let change) = ProtectionGate.shared.propose(.setAdultFilter(on)) {
-                            queued = QueuedNotice(change)
+                        if !proposeOrNotify(.setAdultFilter(on), into: $queued) {
                             adultFilter = SharedStore.shared.adultFilterEnabled
                         }
                     }
@@ -43,16 +36,11 @@ struct HardBlockView: View {
             }
         }
         .navigationTitle("Hard blocks")
+        .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             hardSelection = SharedStore.shared.hardSelection
             adultFilter = SharedStore.shared.adultFilterEnabled
         }
         .queuedChangeAlert($queued)
-    }
-
-    private func applyNow() {
-        if SharedStore.shared.protectionEnabled {
-            SessionManager.shared.refreshShields()
-        }
     }
 }

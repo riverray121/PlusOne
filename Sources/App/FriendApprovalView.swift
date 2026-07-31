@@ -3,8 +3,7 @@ import CloudKit
 import UIKit
 
 // Friend approval sections for AntiTamperView: the owner-side pairing state
-// and the companion-side inbox. Split out so AntiTamperView stays a settings
-// list.
+// and the companion-side inbox.
 struct FriendPairingSection: View {
     @ObservedObject private var friendSync = FriendSync.shared
     @Binding var queued: QueuedNotice?
@@ -29,9 +28,7 @@ struct FriendPairingSection: View {
                 Label("Friend paired", systemImage: "person.2.fill")
                     .foregroundStyle(.green)
                 Button("Unpair friend", role: .destructive) {
-                    if case .queued(let change) = ProtectionGate.shared.propose(.unpairFriend) {
-                        queued = QueuedNotice(change)
-                    }
+                    _ = proposeOrNotify(.unpairFriend, into: $queued)
                 }
             }
             if let error = friendSync.lastError {
@@ -53,10 +50,10 @@ struct FriendPairingSection: View {
     private func startPairing() {
         Task {
             do {
-                let share = try await FriendSync.shared.prepareShare()
+                let share = try await friendSync.prepareShare()
                 sharePresentation = SharePresentation(share: share)
             } catch {
-                FriendSync.shared.lastError = error.localizedDescription
+                friendSync.lastError = error.localizedDescription
             }
         }
     }
@@ -126,7 +123,7 @@ struct CloudSharingSheet: UIViewControllerRepresentable {
 
     final class Coordinator: NSObject, UICloudSharingControllerDelegate {
         func itemTitle(for csc: UICloudSharingController) -> String? {
-            "PlusOne friend approval"
+            FriendSync.shareTitle
         }
 
         func cloudSharingController(_ csc: UICloudSharingController, failedToSaveShareWithError error: Error) {
@@ -134,8 +131,6 @@ struct CloudSharingSheet: UIViewControllerRepresentable {
                 FriendSync.shared.lastError = error.localizedDescription
             }
         }
-
-        func cloudSharingControllerDidSaveShare(_ csc: UICloudSharingController) {}
 
         func cloudSharingControllerDidStopSharing(_ csc: UICloudSharingController) {
             Task { @MainActor in

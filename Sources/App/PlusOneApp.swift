@@ -13,11 +13,10 @@ struct PlusOneApp: App {
             RootView()
                 .environmentObject(appState)
                 .onChange(of: scenePhase) { phase in
-                    // Foreground pass: end lapsed sessions and clear expired
-                    // limits, then re-apply shields, since clearing an
-                    // exhausted limit changes what should be shielded.
-                    // refresh() surfaces an unlock request written by the
-                    // shield action extension.
+                    // Shields are re-applied only after due changes, lapsed
+                    // sessions and expired limits land, since each of those
+                    // changes what should be shielded. refresh() then surfaces
+                    // an unlock request written by the shield action extension.
                     if phase == .active {
                         ProtectionGate.shared.applyDue()
                         SessionManager.shared.endExpiredSessions()
@@ -103,7 +102,8 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         completionHandler()
     }
 
-    // Show the unlock notification even if PlusOne is foregrounded.
+    // Unlock prompts and limit warnings are worth seeing while PlusOne is
+    // open, so foregrounded notifications present instead of being suppressed.
     func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification,

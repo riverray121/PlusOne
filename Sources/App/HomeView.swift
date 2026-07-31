@@ -12,7 +12,7 @@ struct HomeView: View {
                 if appState.pendingUnlock != nil {
                     pendingSection
                 }
-                if !SharedStore.shared.pendingChanges.isEmpty {
+                if pendingChangeCount > 0 {
                     pendingChangesSection
                 }
                 blockedListSection
@@ -134,7 +134,7 @@ struct HomeView: View {
                 HStack {
                     Label("Pending changes", systemImage: "clock")
                     Spacer()
-                    Text("\(SharedStore.shared.pendingChanges.count)")
+                    Text("\(pendingChangeCount)")
                         .foregroundStyle(.secondary)
                 }
             }
@@ -158,6 +158,10 @@ struct HomeView: View {
         } footer: {
             Text("Delay weakening changes so protection cannot be dropped on impulse.")
         }
+    }
+
+    private var pendingChangeCount: Int {
+        SharedStore.shared.pendingChanges.count
     }
 
     private var timeLimitSummary: String {

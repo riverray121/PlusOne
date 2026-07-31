@@ -69,7 +69,8 @@ struct ShieldController {
     }
 
     // The OS app-removal restriction, device-wide by design. Independent of
-    // shields: clearShields leaves it alone.
+    // shields: clearShields leaves it alone. Releasing it clears the value to
+    // nil so the store stops asserting a removal policy at all.
     func setDenyAppRemoval(_ deny: Bool) {
         store.application.denyAppRemoval = deny ? true : nil
     }

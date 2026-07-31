@@ -6,7 +6,6 @@ import SwiftUI
 struct AntiTamperView: View {
     @State private var delay = SharedStore.shared.delayMinutes
     @State private var deletePrevention = SharedStore.shared.deletePreventionEnabled
-    @State private var pendingCount = SharedStore.shared.pendingChanges.count
     @State private var queued: QueuedNotice?
 
     private let delayOptions = [0, 60, 360, 720, 1440, 2880, 4320]
@@ -18,8 +17,7 @@ struct AntiTamperView: View {
                     ForEach(delayOptions, id: \.self) { Text(delayHoursLabel($0)) }
                 }
                 .onChange(of: delay) { minutes in
-                    if case .queued(let change) = ProtectionGate.shared.propose(.setDelay(minutes)) {
-                        queued = QueuedNotice(change)
+                    if !proposeOrNotify(.setDelay(minutes), into: $queued) {
                         delay = SharedStore.shared.delayMinutes
                     }
                 }
@@ -30,8 +28,7 @@ struct AntiTamperView: View {
             Section {
                 Toggle("Prevent app deletion", isOn: $deletePrevention)
                     .onChange(of: deletePrevention) { on in
-                        if case .queued(let change) = ProtectionGate.shared.propose(.setDeletePrevention(on)) {
-                            queued = QueuedNotice(change)
+                        if !proposeOrNotify(.setDeletePrevention(on), into: $queued) {
                             deletePrevention = SharedStore.shared.deletePreventionEnabled
                         }
                     }
@@ -46,7 +43,9 @@ struct AntiTamperView: View {
                     HStack {
                         Label("Pending changes", systemImage: "clock")
                         Spacer()
-                        Text("\(pendingCount)")
+                        // Read per render: queueing from this screen must
+                        // reflect immediately, before any onAppear.
+                        Text("\(SharedStore.shared.pendingChanges.count)")
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -60,7 +59,6 @@ struct AntiTamperView: View {
         .onAppear {
             delay = SharedStore.shared.delayMinutes
             deletePrevention = SharedStore.shared.deletePreventionEnabled
-            pendingCount = SharedStore.shared.pendingChanges.count
             Task { await FriendSync.shared.sync() }
         }
         .queuedChangeAlert($queued)

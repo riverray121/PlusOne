@@ -36,6 +36,7 @@ struct TimeLimitsView: View {
             }
         }
         .navigationTitle("Time limits")
+        .navigationBarTitleDisplayMode(.inline)
         .onAppear { rules = SharedStore.shared.timeLimitRules }
         .queuedChangeAlert($queued)
     }
@@ -44,19 +45,14 @@ struct TimeLimitsView: View {
     // (more minutes, day to hour, items removed) queues; anything else, and
     // all new rules, apply immediately.
     private func save(_ saved: TimeLimitRule) {
-        switch ProtectionGate.shared.propose(.upsertTimeLimitRule(saved)) {
-        case .applied:
+        if proposeOrNotify(.upsertTimeLimitRule(saved), into: $queued) {
             rules = SharedStore.shared.timeLimitRules
-        case .queued(let change):
-            queued = QueuedNotice(change)
         }
     }
 
     private func delete(at offsets: IndexSet) {
         for rule in offsets.map({ rules[$0] }) {
-            if case .queued(let change) = ProtectionGate.shared.propose(.deleteTimeLimitRule(rule.id)) {
-                queued = QueuedNotice(change)
-            }
+            _ = proposeOrNotify(.deleteTimeLimitRule(rule.id), into: $queued)
         }
         rules = SharedStore.shared.timeLimitRules
     }
@@ -72,8 +68,6 @@ struct TimeLimitEditView: View {
         let all = [1, 2, 3, 5, 10, 15, 20, 30, 45, 60, 90, 120]
         return rule.period == .hour ? all.filter { $0 < 60 } : all
     }
-    private let warnOptions = [0, 1, 2, 5, 10]
-
     var body: some View {
         List {
             // The rule is local until Save, so commit needs no extra work.
@@ -94,7 +88,7 @@ struct TimeLimitEditView: View {
                     if period == .hour && rule.minutes >= 60 { rule.minutes = 30 }
                 }
                 Picker("Warn when minutes left", selection: $rule.warnMinutes) {
-                    ForEach(warnOptions, id: \.self) {
+                    ForEach(warnMinuteOptions, id: \.self) {
                         Text($0 == 0 ? "Off" : "\($0) min")
                     }
                 }

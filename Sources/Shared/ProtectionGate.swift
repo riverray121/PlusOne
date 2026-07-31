@@ -21,11 +21,10 @@ struct ProtectionGate {
 
     // With no delay configured and no friend paired, every change is
     // immediate.
-    var gatingActive: Bool {
+    private var gatingActive: Bool {
         store.delayMinutes > 0 || store.friendPaired
     }
 
-    @discardableResult
     func propose(_ kind: PendingChange.Kind, now: Date = Date()) -> Outcome {
         guard gatingActive, isWeakening(kind) else {
             apply(kind)
@@ -131,14 +130,19 @@ struct ProtectionGate {
     private func apply(_ kind: PendingChange.Kind) {
         switch kind {
         case .setProtection(let on):
+            // Flag first and synchronously: refreshShields callers observe it
+            // immediately. Screen Time XPC calls block; keep them off the
+            // calling thread.
             store.protectionEnabled = on
-            if on {
-                ShieldController.shared.applyShields()
-                TimeLimitManager.shared.syncMonitoring()
-            } else {
-                SessionManager.shared.endAllSessions()
-                TimeLimitManager.shared.stopAll()
-                ShieldController.shared.clearShields()
+            Task.detached {
+                if on {
+                    ShieldController.shared.applyShields()
+                    TimeLimitManager.shared.syncMonitoring()
+                } else {
+                    SessionManager.shared.endAllSessions()
+                    TimeLimitManager.shared.stopAll()
+                    ShieldController.shared.clearShields()
+                }
             }
         case .removeSelfieItems(let removed):
             store.selection = store.selection.subtracting(removed)
@@ -186,7 +190,7 @@ struct ProtectionGate {
         }
     }
 
-    static func summary(for kind: PendingChange.Kind) -> String {
+    private static func summary(for kind: PendingChange.Kind) -> String {
         switch kind {
         case .setProtection:
             return "Turn protection off"

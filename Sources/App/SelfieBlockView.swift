@@ -14,7 +14,6 @@ struct SelfieBlockView: View {
     private let durationOptions = [1, 2, 3, 5, 10, 15, 20, 30, 45, 60]
     private let cooldownOptions = [0, 5, 15, 30, 60, 120]
     private let capOptions = Array(0...10)
-    private let warnOptions = [0, 1, 2, 5, 10]
 
     var body: some View {
         List {
@@ -25,13 +24,7 @@ struct SelfieBlockView: View {
                 selection: $appState.selection,
                 footer: "Blocked until a selfie shows at least two people, then unlocked for the duration below. Swipe an item left to remove it.",
                 removal: { removed in
-                    switch ProtectionGate.shared.propose(.removeSelfieItems(removed)) {
-                    case .applied:
-                        return true
-                    case .queued(let change):
-                        queued = QueuedNotice(change)
-                        return false
-                    }
+                    proposeOrNotify(.removeSelfieItems(removed), into: $queued)
                 }
             ) { _ in }
 
@@ -40,8 +33,7 @@ struct SelfieBlockView: View {
                     ForEach(durationOptions, id: \.self) { Text("\($0) min") }
                 }
                 .onChange(of: duration) { minutes in
-                    if case .queued(let change) = ProtectionGate.shared.propose(.setDuration(minutes)) {
-                        queued = QueuedNotice(change)
+                    if !proposeOrNotify(.setDuration(minutes), into: $queued) {
                         duration = SharedStore.shared.durationMinutes
                     }
                 }
@@ -52,8 +44,7 @@ struct SelfieBlockView: View {
                     }
                 }
                 .onChange(of: cooldown) { minutes in
-                    if case .queued(let change) = ProtectionGate.shared.propose(.setCooldown(minutes)) {
-                        queued = QueuedNotice(change)
+                    if !proposeOrNotify(.setCooldown(minutes), into: $queued) {
                         cooldown = SharedStore.shared.cooldownMinutes
                     }
                 }
@@ -64,18 +55,19 @@ struct SelfieBlockView: View {
                     }
                 }
                 .onChange(of: cap) { sessions in
-                    if case .queued(let change) = ProtectionGate.shared.propose(.setDailyCap(sessions)) {
-                        queued = QueuedNotice(change)
+                    if !proposeOrNotify(.setDailyCap(sessions), into: $queued) {
                         cap = SharedStore.shared.dailyCap
                     }
                 }
 
                 Picker("Warn when minutes left", selection: $warn) {
-                    ForEach(warnOptions, id: \.self) {
+                    ForEach(warnMinuteOptions, id: \.self) {
                         Text($0 == 0 ? "Off" : "\($0) min")
                     }
                 }
-                .onChange(of: warn) { SharedStore.shared.sessionWarnMinutes = $0 }
+                .onChange(of: warn) { minutes in
+                    SharedStore.shared.sessionWarnMinutes = minutes
+                }
             } footer: {
                 Text("Duration is minutes of usage granted per selfie pass and applies to the next session. Cooldown is the wait required between sessions. The cap is the maximum sessions per day. The warning notifies when a session has this many minutes remaining; it is skipped when the duration is at or under the warning value.")
             }

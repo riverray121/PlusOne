@@ -94,6 +94,24 @@ struct OnboardingView: View {
                     appState.selection = pickerBuffer
                 }
             }
+            // A relaunch mid-onboarding starts the grant flags at false;
+            // re-query so already-granted permissions show as done.
+            .onAppear { refreshGrants() }
+        }
+    }
+
+    private func refreshGrants() {
+        #if !targetEnvironment(simulator)
+        if AuthorizationCenter.shared.authorizationStatus == .approved {
+            screenTimeGranted = true
+        }
+        #endif
+        if AVCaptureDevice.authorizationStatus(for: .video) == .authorized {
+            cameraGranted = true
+        }
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            guard settings.authorizationStatus == .authorized else { return }
+            DispatchQueue.main.async { notificationsGranted = true }
         }
     }
 

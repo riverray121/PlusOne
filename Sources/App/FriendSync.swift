@@ -20,6 +20,8 @@ final class FriendSync: ObservableObject {
     static let shared = FriendSync()
 
     static let containerID = "iCloud.com.riverray.PlusOne"
+    // Shown as the invitation title and in the system share sheet.
+    static let shareTitle = "PlusOne friend approval"
     private static let zoneName = "approvals"
     private static let recordType = "ApprovalRequest"
 
@@ -90,7 +92,7 @@ final class FriendSync: ObservableObject {
             return existing
         }
         let share = CKShare(recordZoneID: zoneID)
-        share[CKShare.SystemFieldKey.title] = "PlusOne friend approval" as CKRecordValue
+        share[CKShare.SystemFieldKey.title] = Self.shareTitle as CKRecordValue
         share.publicPermission = .none
         let (saveResults, _) = try await privateDB.modifyRecords(saving: [share], deleting: [])
         for (_, result) in saveResults {
@@ -115,7 +117,7 @@ final class FriendSync: ObservableObject {
 
     // MARK: Owner: sync
 
-    func syncOwner() async {
+    private func syncOwner() async {
         do {
             switch ownerState {
             case .none:
@@ -180,7 +182,8 @@ final class FriendSync: ObservableObject {
         let cancelled = requestedIDs().filter { !pendingIDs.contains($0) }
         if !cancelled.isEmpty {
             let ids = cancelled.map { CKRecord.ID(recordName: $0, zoneID: zoneID) }
-            _ = try await privateDB.modifyRecords(saving: [], deleting: ids)
+            let (_, deleteResults) = try await privateDB.modifyRecords(saving: [], deleting: ids)
+            try checkDeletes(deleteResults)
         }
 
         guard !pending.isEmpty else {
@@ -189,7 +192,7 @@ final class FriendSync: ObservableObject {
         }
 
         let ids = pending.map { CKRecord.ID(recordName: $0.id.uuidString, zoneID: zoneID) }
-        let results = try await privateDB.records(for: ids, desiredKeys: nil)
+        let results = try await privateDB.records(for: ids)
         var toSave: [CKRecord] = []
         var toDelete: [CKRecord.ID] = []
         for change in pending {
@@ -214,9 +217,28 @@ final class FriendSync: ObservableObject {
             }
         }
         if !toSave.isEmpty || !toDelete.isEmpty {
-            _ = try await privateDB.modifyRecords(saving: toSave, deleting: toDelete)
+            let (saveResults, deleteResults) = try await privateDB.modifyRecords(saving: toSave, deleting: toDelete)
+            for (_, result) in saveResults {
+                _ = try result.get()
+            }
+            try checkDeletes(deleteResults)
         }
+        // Resolving drops approved and denied changes from the queue, so the
+        // mirror tracks the queue as it stands, not `pending`.
         setRequestedIDs(SharedStore.shared.pendingChanges.map { $0.id.uuidString })
+    }
+
+    // A record already gone counts as deleted: a crash between a delete and
+    // the requestedIDs update must not wedge every later sync. Any other
+    // failure throws so the caller surfaces it and the next sync retries.
+    private func checkDeletes(_ results: [CKRecord.ID: Result<Void, Error>]) throws {
+        for (_, result) in results {
+            do {
+                try result.get()
+            } catch let error as CKError where error.code == .unknownItem {
+                continue
+            }
+        }
     }
 
     private func teardownShare() async throws {
@@ -241,7 +263,7 @@ final class FriendSync: ObservableObject {
         }
     }
 
-    func syncCompanion() async {
+    private func syncCompanion() async {
         guard isCompanion else { return }
         do {
             let zones = try await sharedDB.allRecordZones()
@@ -252,18 +274,17 @@ final class FriendSync: ObservableObject {
                 incomingRequests = []
                 return
             }
-            var requests: [(Date, IncomingRequest)] = []
+            var records: [CKRecord] = []
             for zone in approvalZones {
-                for record in try await allRecords(in: zone.zoneID, database: sharedDB)
-                where record.recordType == Self.recordType
-                    && record["status"] as? String == Status.pending.rawValue {
-                    requests.append((
-                        record.creationDate ?? .distantPast,
-                        IncomingRequest(id: record.recordID, summary: record["summary"] as? String ?? "A settings change")
-                    ))
-                }
+                let zoneRecords = try await allRecords(in: zone.zoneID)
+                records.append(contentsOf: zoneRecords.filter {
+                    $0.recordType == Self.recordType
+                        && $0["status"] as? String == Status.pending.rawValue
+                })
             }
-            incomingRequests = requests.sorted { $0.0 < $1.0 }.map { $0.1 }
+            incomingRequests = records
+                .sorted { ($0.creationDate ?? .distantPast) < ($1.creationDate ?? .distantPast) }
+                .map { IncomingRequest(id: $0.recordID, summary: $0["summary"] as? String ?? "A settings change") }
             lastError = nil
         } catch {
             lastError = error.localizedDescription
@@ -321,7 +342,7 @@ final class FriendSync: ObservableObject {
 
     // Zone-change fetch with a nil token returns every record in the zone.
     // The zone holds at most a handful of requests, so no token bookkeeping.
-    private func allRecords(in zoneID: CKRecordZone.ID, database: CKDatabase) async throws -> [CKRecord] {
+    private func allRecords(in zoneID: CKRecordZone.ID) async throws -> [CKRecord] {
         try await withCheckedThrowingContinuation { continuation in
             var records: [CKRecord] = []
             let operation = CKFetchRecordZoneChangesOperation(
@@ -341,7 +362,7 @@ final class FriendSync: ObservableObject {
                     continuation.resume(throwing: error)
                 }
             }
-            database.add(operation)
+            sharedDB.add(operation)
         }
     }
 }
