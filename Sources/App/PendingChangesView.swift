@@ -18,7 +18,7 @@ struct PendingChangesView: View {
                         row(change)
                     }
                 } footer: {
-                    Text("Weakening changes wait here before taking effect. A change whose countdown has ended applies the next time the app opens. Cancel keeps things as they are.")
+                    Text("These changes are waiting out your delay. Each one takes effect the next time you open the app after its countdown ends. Cancel keeps things as they are.")
                 }
             }
         }

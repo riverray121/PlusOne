@@ -21,7 +21,7 @@ struct AntiTamperView: View {
                         }
                     }
             } footer: {
-                Text("While this is on, no app on this phone can be deleted, including PlusOne itself. Turning it back off is treated as a weakening change. Heads up: removing PlusOne's Screen Time permission in Settings also turns this off.")
+                Text("While this is on, no app on this phone can be deleted, including PlusOne itself. Turning it back off counts as loosening your protection, so it waits out the delay.")
             }
 
             Section {
@@ -47,7 +47,7 @@ struct AntiTamperView: View {
                     }
                 }
             } footer: {
-                Text("Any change that weakens your protection has to wait this long before it takes effect. While it waits you can cancel it. Changes that make protection stronger happen right away.")
+                Text("Any change that loosens your protection has to wait this long before it takes effect. While it waits you can cancel it. Changes that tighten protection happen right away.")
             }
 
             FriendPairingSection(queued: $queued, sharePresentation: $sharePresentation)

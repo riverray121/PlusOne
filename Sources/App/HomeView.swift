@@ -139,7 +139,7 @@ struct HomeView: View {
                 }
             }
         } footer: {
-            Text("Weakening changes waiting out the settings change delay.")
+            Text("Changes waiting out your delay. Each one takes effect when its countdown ends.")
         }
     }
 
@@ -156,7 +156,7 @@ struct HomeView: View {
                 }
             }
         } footer: {
-            Text("Delay weakening changes so protection cannot be dropped on impulse.")
+            Text("Makes loosening your protection slow and deliberate.")
         }
     }
 

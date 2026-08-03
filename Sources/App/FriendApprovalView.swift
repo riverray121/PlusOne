@@ -38,7 +38,7 @@ struct FriendPairingSection: View {
                     friendSync.resetPairing()
                 }
             case .paired:
-                Label("Friend paired", systemImage: "person.2.fill")
+                Label("Paired with \(friendSync.ownerFriendName ?? "your friend")", systemImage: "person.2.fill")
                     .foregroundStyle(.green)
                 Button("Unpair friend", role: .destructive) {
                     _ = proposeOrNotify(.unpairFriend, into: $queued)
@@ -52,7 +52,7 @@ struct FriendPairingSection: View {
         } header: {
             Text("Friend approval")
         } footer: {
-            Text("When you try to weaken your protection, your friend gets asked first. If they approve, it happens right away. If they say no, it doesn't happen. If they never answer, the delay timer decides.")
+            Text("When you try to loosen your protection, your friend gets asked first. If they approve, the change happens right away. If they say no, it doesn't happen. If they never answer, the delay timer decides.")
         }
     }
 
@@ -80,7 +80,7 @@ struct FriendInboxSection: View {
         if friendSync.isCompanion {
             Section {
                 if friendSync.incomingRequests.isEmpty {
-                    Text("No requests.")
+                    Text("No requests right now.")
                         .foregroundStyle(.secondary)
                 } else {
                     ForEach(friendSync.incomingRequests) { request in
@@ -101,9 +101,9 @@ struct FriendInboxSection: View {
                     }
                 }
             } header: {
-                Text("Approve for your friend")
+                Text("Approve for \(friendSync.companionFriendName ?? "your friend")")
             } footer: {
-                Text("Your friend wants to change their protection. Approve and it happens right away. Deny and nothing changes.")
+                Text("When \(friendSync.companionFriendName ?? "your friend") tries to loosen their protection, the request shows up here. Approve and it happens right away. Deny and nothing changes.")
             }
         }
     }

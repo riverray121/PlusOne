@@ -35,6 +35,9 @@ struct PlusOneApp: App {
 
 struct RootView: View {
     @EnvironmentObject private var appState: AppState
+    // Accepting a pairing invitation lands here from a Messages link with no
+    // in-app context; this confirmation is the only feedback that it worked.
+    @ObservedObject private var friendSync = FriendSync.shared
 
     var body: some View {
         Group {
@@ -46,6 +49,18 @@ struct RootView: View {
         }
         .sheet(item: $appState.captureRequest, onDismiss: { appState.captureDidDismiss() }) { request in
             CaptureView(target: request.target)
+        }
+        .alert(
+            "You're paired",
+            isPresented: Binding(
+                get: { friendSync.acceptedFriendName != nil },
+                set: { if !$0 { friendSync.acceptedFriendName = nil } }
+            ),
+            presenting: friendSync.acceptedFriendName
+        ) { _ in
+            Button("OK") {}
+        } message: { name in
+            Text("You're now \(name)'s accountability partner. When they try to loosen their protection, you approve or deny it under Anti-tamper.")
         }
     }
 }

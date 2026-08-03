@@ -49,6 +49,13 @@ final class FriendSync: ObservableObject {
     @Published private(set) var ownerState: OwnerState
     @Published private(set) var isCompanion: Bool
     @Published private(set) var incomingRequests: [IncomingRequest] = []
+    // Display names from the share identities; nil when iCloud withholds
+    // them, so UI copy falls back to "your friend".
+    @Published private(set) var ownerFriendName: String?
+    @Published private(set) var companionFriendName: String?
+    // Set when a share acceptance completes; RootView shows the confirmation
+    // and clears it.
+    @Published var acceptedFriendName: String?
     @Published var lastError: String?
 
     private let defaults = UserDefaults.standard
@@ -56,6 +63,8 @@ final class FriendSync: ObservableObject {
     private init() {
         ownerState = OwnerState(rawValue: defaults.string(forKey: "ownerPairingState") ?? "") ?? .none
         isCompanion = defaults.bool(forKey: "companionPaired")
+        ownerFriendName = defaults.string(forKey: "ownerFriendName")
+        companionFriendName = defaults.string(forKey: "companionFriendName")
         NotificationCenter.default.addObserver(
             forName: .plusOnePendingChangesChanged, object: nil, queue: .main
         ) { [weak self] _ in
@@ -67,11 +76,33 @@ final class FriendSync: ObservableObject {
         ownerState = state
         defaults.set(state.rawValue, forKey: "ownerPairingState")
         SharedStore.shared.friendPaired = state == .paired
+        if state == .none {
+            setOwnerFriendName(nil)
+        }
     }
 
     private func setCompanion(_ on: Bool) {
         isCompanion = on
         defaults.set(on, forKey: "companionPaired")
+        if !on {
+            setCompanionFriendName(nil)
+        }
+    }
+
+    private func setOwnerFriendName(_ name: String?) {
+        ownerFriendName = name
+        defaults.set(name, forKey: "ownerFriendName")
+    }
+
+    private func setCompanionFriendName(_ name: String?) {
+        companionFriendName = name
+        defaults.set(name, forKey: "companionFriendName")
+    }
+
+    private static func displayName(_ identity: CKUserIdentity) -> String? {
+        identity.nameComponents.map {
+            PersonNameComponentsFormatter.localizedString(from: $0, style: .default)
+        }
     }
 
     func sync() async {
@@ -190,8 +221,9 @@ final class FriendSync: ObservableObject {
                     resetPairing()
                     break
                 }
-                if share.participants.contains(where: { $0.role != .owner && $0.acceptanceStatus == .accepted }) {
+                if let accepted = share.participants.first(where: { $0.role != .owner && $0.acceptanceStatus == .accepted }) {
                     setOwnerState(.paired)
+                    setOwnerFriendName(Self.displayName(accepted.userIdentity))
                     await syncOwner()
                     return
                 }
@@ -201,12 +233,17 @@ final class FriendSync: ObservableObject {
                     resetPairing()
                     break
                 }
-                guard try await fetchShare() != nil else {
+                guard let share = try await fetchShare() else {
                     // Share revoked outside the app: treat as unpaired.
                     // Queued approval-only changes stay queued; the user can
                     // cancel them, which is always allowed.
                     resetPairing()
                     break
+                }
+                // Backfill for pairings that predate name capture.
+                if ownerFriendName == nil,
+                   let accepted = share.participants.first(where: { $0.role != .owner && $0.acceptanceStatus == .accepted }) {
+                    setOwnerFriendName(Self.displayName(accepted.userIdentity))
                 }
                 try await reconcileRequests()
             }
@@ -315,12 +352,6 @@ final class FriendSync: ObservableObject {
         }
     }
 
-    private func teardownShare() async throws {
-        _ = try await privateDB.modifyRecordZones(saving: [], deleting: [zoneID])
-        setOwnerState(.none)
-        setRequestedIDs([])
-    }
-
     // MARK: Companion
 
     func acceptShare(metadata: CKShare.Metadata) {
@@ -328,6 +359,8 @@ final class FriendSync: ObservableObject {
             do {
                 _ = try await container.accept(metadata)
                 setCompanion(true)
+                setCompanionFriendName(Self.displayName(metadata.ownerIdentity))
+                acceptedFriendName = companionFriendName ?? "your friend"
                 await ensureCompanionSubscription()
                 await syncCompanion()
                 lastError = nil
@@ -350,6 +383,13 @@ final class FriendSync: ObservableObject {
             }
             var records: [CKRecord] = []
             for zone in approvalZones {
+                // Backfill for acceptances that predate name capture.
+                if companionFriendName == nil,
+                   let share = try? await sharedDB.record(
+                       for: CKRecord.ID(recordName: CKRecordNameZoneWideShare, zoneID: zone.zoneID)
+                   ) as? CKShare {
+                    setCompanionFriendName(Self.displayName(share.owner.userIdentity))
+                }
                 let zoneRecords = try await allRecords(in: zone.zoneID)
                 records.append(contentsOf: zoneRecords.filter {
                     $0.recordType == Self.recordType
