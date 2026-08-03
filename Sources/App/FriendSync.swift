@@ -90,6 +90,9 @@ final class FriendSync: ObservableObject {
     func prepareShare() async throws -> CKShare {
         await finishTeardown()
         if let existing = try await fetchShare() {
+            #if DEBUG
+            await registerSchema()
+            #endif
             return existing
         }
         _ = try await privateDB.modifyRecordZones(saving: [CKRecordZone(zoneID: zoneID)], deleting: [])
@@ -124,14 +127,22 @@ final class FriendSync: ObservableObject {
     // environment; production gets them solely via a console schema deploy.
     // Saving and deleting a throwaway ApprovalRequest here puts the type into
     // the development schema, so one deploy carries the complete schema and a
-    // TestFlight build cannot hit "type not found" on its first request.
+    // TestFlight build cannot hit "type not found" on its first request. Runs
+    // on every prepareShare path (the zone may predate the bootstrap); the
+    // flag keeps it to one round trip per install.
     private func registerSchema() async {
+        guard !defaults.bool(forKey: "schemaRegistered") else { return }
         let recordID = CKRecord.ID(recordName: "schema-bootstrap", zoneID: zoneID)
         let record = CKRecord(recordType: Self.recordType, recordID: recordID)
         record["summary"] = "schema bootstrap"
         record["status"] = Status.pending.rawValue
-        _ = try? await privateDB.modifyRecords(saving: [record], deleting: [])
-        _ = try? await privateDB.modifyRecords(saving: [], deleting: [recordID])
+        do {
+            _ = try await privateDB.modifyRecords(saving: [record], deleting: [])
+            _ = try await privateDB.modifyRecords(saving: [], deleting: [recordID])
+            defaults.set(true, forKey: "schemaRegistered")
+        } catch {
+            report(error)
+        }
     }
     #endif
 
