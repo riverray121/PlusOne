@@ -7,6 +7,7 @@ struct AntiTamperView: View {
     @State private var delay = SharedStore.shared.delayMinutes
     @State private var deletePrevention = SharedStore.shared.deletePreventionEnabled
     @State private var queued: QueuedNotice?
+    @State private var sharePresentation: SharePresentation?
 
     private let delayOptions = [0, 60, 360, 720, 1440, 2880, 4320]
 
@@ -49,11 +50,15 @@ struct AntiTamperView: View {
                 Text("Changes that weaken protection wait this long, with a countdown and cancel. Strengthening is always immediate.")
             }
 
-            FriendPairingSection(queued: $queued)
+            FriendPairingSection(queued: $queued, sharePresentation: $sharePresentation)
             FriendInboxSection()
         }
         .navigationTitle("Anti-tamper")
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(item: $sharePresentation) { presentation in
+            CloudSharingSheet(share: presentation.share)
+                .ignoresSafeArea()
+        }
         .onAppear {
             delay = SharedStore.shared.delayMinutes
             deletePrevention = SharedStore.shared.deletePreventionEnabled

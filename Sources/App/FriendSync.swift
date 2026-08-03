@@ -93,6 +93,9 @@ final class FriendSync: ObservableObject {
             return existing
         }
         _ = try await privateDB.modifyRecordZones(saving: [CKRecordZone(zoneID: zoneID)], deleting: [])
+        #if DEBUG
+        await registerSchema()
+        #endif
         let share = CKShare(recordZoneID: zoneID)
         share[CKShare.SystemFieldKey.title] = Self.shareTitle as CKRecordValue
         // Without a thumbnail the invitation renders with a generic
@@ -101,12 +104,36 @@ final class FriendSync: ObservableObject {
             share[CKShare.SystemFieldKey.thumbnailImageData] = thumbnail as CKRecordValue
         }
         share.publicPermission = .none
-        let (saveResults, _) = try await privateDB.modifyRecords(saving: [share], deleting: [])
-        for (_, result) in saveResults {
-            _ = try result.get()
+        do {
+            let (saveResults, _) = try await privateDB.modifyRecords(saving: [share], deleting: [])
+            for (_, result) in saveResults {
+                _ = try result.get()
+            }
+        } catch let error as CKError where error.code == .serverRecordChanged {
+            // The zone gained a share between the fetch and the save; use it.
+            if let existing = try await fetchShare() {
+                return existing
+            }
+            throw error
         }
         return share
     }
+
+    #if DEBUG
+    // CloudKit creates record types just-in-time only in the development
+    // environment; production gets them solely via a console schema deploy.
+    // Saving and deleting a throwaway ApprovalRequest here puts the type into
+    // the development schema, so one deploy carries the complete schema and a
+    // TestFlight build cannot hit "type not found" on its first request.
+    private func registerSchema() async {
+        let recordID = CKRecord.ID(recordName: "schema-bootstrap", zoneID: zoneID)
+        let record = CKRecord(recordType: Self.recordType, recordID: recordID)
+        record["summary"] = "schema bootstrap"
+        record["status"] = Status.pending.rawValue
+        _ = try? await privateDB.modifyRecords(saving: [record], deleting: [])
+        _ = try? await privateDB.modifyRecords(saving: [], deleting: [recordID])
+    }
+    #endif
 
     // The sharing sheet saved the invitation: the only path that sends
     // anything to anyone.
@@ -135,7 +162,7 @@ final class FriendSync: ObservableObject {
             _ = try await privateDB.modifyRecordZones(saving: [], deleting: [zoneID])
             defaults.set(false, forKey: "teardownNeeded")
         } catch {
-            lastError = error.localizedDescription
+            report(error)
         }
     }
 
@@ -174,8 +201,20 @@ final class FriendSync: ObservableObject {
             }
             lastError = nil
         } catch {
-            lastError = error.localizedDescription
+            report(error)
         }
+    }
+
+    // localizedDescription for CKErrors is a record-ID dump; the server's own
+    // reason string is the part that identifies the failure.
+    func report(_ error: Error) {
+        guard let ckError = error as? CKError else {
+            lastError = error.localizedDescription
+            return
+        }
+        let detail = ckError.userInfo["ServerErrorDescription"] as? String
+            ?? ckError.localizedDescription
+        lastError = "\(detail) (CKError \(ckError.code.rawValue))"
     }
 
     private func fetchShare() async throws -> CKShare? {
@@ -282,7 +321,7 @@ final class FriendSync: ObservableObject {
                 await syncCompanion()
                 lastError = nil
             } catch {
-                lastError = error.localizedDescription
+                report(error)
             }
         }
     }
@@ -311,7 +350,7 @@ final class FriendSync: ObservableObject {
                 .map { IncomingRequest(id: $0.recordID, summary: $0["summary"] as? String ?? "A settings change") }
             lastError = nil
         } catch {
-            lastError = error.localizedDescription
+            report(error)
         }
     }
 
@@ -327,7 +366,7 @@ final class FriendSync: ObservableObject {
                 incomingRequests.removeAll { $0.id == request.id }
                 lastError = nil
             } catch {
-                lastError = error.localizedDescription
+                report(error)
             }
         }
     }

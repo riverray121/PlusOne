@@ -4,10 +4,12 @@ import UIKit
 
 // Friend approval sections for AntiTamperView: the owner-side pairing state
 // and the companion-side inbox.
+// The share sheet item lives in the parent screen: presentation modifiers
+// attached to a Section inside a List present and then immediately dismiss.
 struct FriendPairingSection: View {
     @ObservedObject private var friendSync = FriendSync.shared
     @Binding var queued: QueuedNotice?
-    @State private var sharePresentation: SharePresentation?
+    @Binding var sharePresentation: SharePresentation?
     @State private var isPreparing = false
 
     var body: some View {
@@ -52,10 +54,6 @@ struct FriendPairingSection: View {
         } footer: {
             Text("Weakening changes go to your friend: approved applies now, denied is discarded, unanswered falls back to the delay. Only requests and responses sync over iCloud.")
         }
-        .sheet(item: $sharePresentation) { presentation in
-            CloudSharingSheet(share: presentation.share)
-                .ignoresSafeArea()
-        }
     }
 
     // The guard and flag stop double-taps from racing two share creations;
@@ -69,7 +67,7 @@ struct FriendPairingSection: View {
                 let share = try await friendSync.prepareShare()
                 sharePresentation = SharePresentation(share: share)
             } catch {
-                friendSync.lastError = error.localizedDescription
+                friendSync.report(error)
             }
         }
     }
@@ -144,7 +142,7 @@ struct CloudSharingSheet: UIViewControllerRepresentable {
 
         func cloudSharingController(_ csc: UICloudSharingController, failedToSaveShareWithError error: Error) {
             Task { @MainActor in
-                FriendSync.shared.lastError = error.localizedDescription
+                FriendSync.shared.report(error)
             }
         }
 
