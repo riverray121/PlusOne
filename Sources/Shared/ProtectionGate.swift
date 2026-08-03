@@ -70,6 +70,18 @@ struct ProtectionGate {
         notifyPendingChanged()
     }
 
+    // Marks a queued change as sent to the paired friends. Sending is an
+    // explicit user action; queuing alone notifies no one.
+    func requestApproval(_ id: UUID) {
+        store.pendingChanges = store.pendingChanges.map { change in
+            guard change.id == id else { return change }
+            var sent = change
+            sent.approvalRequested = true
+            return sent
+        }
+        notifyPendingChanged()
+    }
+
     // Cancelling keeps the stronger settings; always immediate.
     func cancel(_ id: UUID) {
         store.pendingChanges = store.pendingChanges.filter { $0.id != id }

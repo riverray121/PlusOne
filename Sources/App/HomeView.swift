@@ -22,6 +22,14 @@ struct HomeView: View {
             // Summary counts read SharedStore directly; re-render on return
             // from child screens so they never show stale values.
             .onAppear { appState.refresh() }
+            // A friend's verdict can land while Home is open; refresh so the
+            // pending section and counts follow.
+            .onReceive(
+                NotificationCenter.default.publisher(for: .plusOnePendingChangesChanged)
+                    .receive(on: RunLoop.main)
+            ) { _ in
+                appState.refresh()
+            }
             .queuedChangeAlert($queued)
         }
     }

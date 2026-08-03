@@ -64,6 +64,15 @@ struct AntiTamperView: View {
             deletePrevention = SharedStore.shared.deletePreventionEnabled
             Task { await FriendSync.shared.sync() }
         }
+        // Applied verdicts change the delay, toggle states, and the pending
+        // count; re-read so this screen follows without a reappear.
+        .onReceive(
+            NotificationCenter.default.publisher(for: .plusOnePendingChangesChanged)
+                .receive(on: RunLoop.main)
+        ) { _ in
+            delay = SharedStore.shared.delayMinutes
+            deletePrevention = SharedStore.shared.deletePreventionEnabled
+        }
         .queuedChangeAlert($queued)
     }
 }

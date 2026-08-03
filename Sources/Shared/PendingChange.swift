@@ -30,6 +30,34 @@ struct PendingChange: Codable, Identifiable {
     // paired friend sees.
     let summary: String
     let kind: Kind
+    // Whether the owner sent this change to their friends. Sending is
+    // explicit; queuing alone notifies no one.
+    var approvalRequested: Bool
+
+    init(id: UUID, createdAt: Date, appliesAt: Date?, summary: String, kind: Kind) {
+        self.id = id
+        self.createdAt = createdAt
+        self.appliesAt = appliesAt
+        self.summary = summary
+        self.kind = kind
+        approvalRequested = false
+    }
+
+    // approvalRequested is decoded leniently so changes persisted without
+    // the key still load.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        appliesAt = try container.decodeIfPresent(Date.self, forKey: .appliesAt)
+        summary = try container.decode(String.self, forKey: .summary)
+        kind = try container.decode(Kind.self, forKey: .kind)
+        approvalRequested = try container.decodeIfPresent(Bool.self, forKey: .approvalRequested) ?? false
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, createdAt, appliesAt, summary, kind, approvalRequested
+    }
 
     // One pending change per setting: a proposal with the same key replaces
     // the previous one and restarts its countdown. Selection removals

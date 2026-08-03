@@ -11,7 +11,7 @@ settings:
     # from this spec discards any selection made in Xcode.
     CODE_SIGN_STYLE: Automatic
     DEVELOPMENT_TEAM: 76DJ96729W
-    CURRENT_PROJECT_VERSION: 4
+    CURRENT_PROJECT_VERSION: 5
     MARKETING_VERSION: 0.1.0
 
 targets:

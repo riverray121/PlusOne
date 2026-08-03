@@ -29,6 +29,15 @@ struct PendingChangesView: View {
         .onAppear {
             ProtectionGate.shared.applyDue()
             changes = SharedStore.shared.pendingChanges
+            Task { await FriendSync.shared.sync() }
+        }
+        // A friend's verdict can land while this screen is open; the gate
+        // posts after every queue mutation.
+        .onReceive(
+            NotificationCenter.default.publisher(for: .plusOnePendingChangesChanged)
+                .receive(on: RunLoop.main)
+        ) { _ in
+            changes = SharedStore.shared.pendingChanges
         }
     }
 
@@ -37,35 +46,49 @@ struct PendingChangesView: View {
     }
 
     private func row(_ change: PendingChange) -> some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(change.summary)
-                countdown(change)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(change.summary)
+                    status(change)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Button("Cancel") {
+                    ProtectionGate.shared.cancel(change.id)
+                    changes = SharedStore.shared.pendingChanges
+                }
+                .buttonStyle(.bordered)
             }
-            Spacer()
-            Button("Cancel") {
-                ProtectionGate.shared.cancel(change.id)
-                changes = SharedStore.shared.pendingChanges
+            if SharedStore.shared.friendPaired && !change.approvalRequested {
+                Button("Ask a friend to approve") {
+                    ProtectionGate.shared.requestApproval(change.id)
+                    changes = SharedStore.shared.pendingChanges
+                }
+                .buttonStyle(.borderedProminent)
             }
-            .buttonStyle(.bordered)
         }
+        .padding(.vertical, 2)
     }
 
     @ViewBuilder
-    private func countdown(_ change: PendingChange) -> some View {
-        // One Date.now sample: the range below must not invert if the
-        // deadline passes between a check and the range construction.
+    private func status(_ change: PendingChange) -> some View {
+        // One Date sample: the range below must not invert if the deadline
+        // passes between a check and the range construction.
         let now = Date()
         if let appliesAt = change.appliesAt {
             if appliesAt <= now {
                 Text("Applies on next launch")
+            } else if change.approvalRequested {
+                Text("Applies in ") + Text(timerInterval: now...appliesAt, countsDown: true) + Text(", or sooner if a friend approves")
             } else {
                 Text("Applies in ") + Text(timerInterval: now...appliesAt, countsDown: true)
             }
+        } else if change.approvalRequested {
+            Text("Waiting for a friend's approval")
         } else {
-            Text("Waiting for your friend's approval")
+            Text("Waits until a friend approves")
         }
     }
 }
@@ -82,9 +105,9 @@ struct QueuedNotice {
 
     var message: String {
         guard let appliesAt else {
-            return "\(summary): waiting for your friend's approval. Cancel anytime under Anti-tamper."
+            return "\(summary): waits until a friend approves it. Send or cancel it under Pending changes."
         }
-        return "\(summary): applies \(appliesAt.formatted(date: .abbreviated, time: .shortened)) unless cancelled under Anti-tamper."
+        return "\(summary): applies \(appliesAt.formatted(date: .abbreviated, time: .shortened)) unless cancelled under Pending changes."
     }
 }
 

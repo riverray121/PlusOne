@@ -68,10 +68,11 @@ data never leave the device.
   companion role. One phone shows an iCloud share invite (or QR code), the
   other accepts, creating a shared CloudKit record zone between the two
   iCloud accounts.
-- Requesting: a weakening change writes an approval request record to the
-  shared zone, in plain language ("Remove Instagram from blocking"). The
-  friend's phone gets a push notification via a CloudKit subscription; Apple
-  delivers the push.
+- Requesting: the user sends a queued weakening change to their friends as an
+  approval request record in the shared zone, in plain language ("Remove
+  Instagram from blocking"). Sending is explicit; queuing alone notifies no
+  one. The friend's phone gets a push notification via a CloudKit
+  subscription; Apple delivers the push.
 - Approving: the friend opens PlusOne, sees the request, taps approve or
   deny. The response syncs back; approved changes apply, denied ones are
   discarded.
@@ -84,10 +85,11 @@ data never leave the device.
   anytime (cancel strengthens, so it is always allowed).
 
 ### Scope
-- In: pairing, one trusted friend, approval requests for all weakenings,
-  push notifications, unpair protection.
-- Out: multiple friends, split approval, messaging, any visibility into the
-  user's activity beyond the requests themselves.
+- In: pairing, multiple friends as participants on one share (any single
+  approval suffices), user-initiated approval requests for queued weakenings,
+  push notifications, unpair protection (unpairing removes all friends).
+- Out: split approval, per-friend requests, messaging, any visibility into
+  the user's activity beyond the requests themselves.
 
 ## Build order
 1. Settings change delay: the foundation the other two lean on.

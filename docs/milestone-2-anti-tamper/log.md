@@ -23,3 +23,7 @@ Development context for resuming work. Keep entries to one line. Not a changelog
 - denyAppRemoval rides the same named ManagedSettingsStore as shields but clearShields leaves it alone; protection off and delete prevention are independent.
 - Delay bounds decided: Off, 1, 6, 12, 24, 48, 72 hours, default Off. Denied requests may be re-requested immediately.
 - CloudKit entitlements (container iCloud.com.riverray.PlusOne, aps-environment, remote-notification background mode, CKSharingSupported) are app-target only; Shared stays CloudKit-free so extensions do not link it.
+- Multiple friends are participants on the one zone-wide share; any accepted participant can flip a request's status. Unpair deletes the zone and removes everyone.
+- Approval requests are explicit: PendingChange.approvalRequested gates mirroring to CloudKit; queuing alone notifies no one. Requests are sent per change from Pending changes.
+- CKUserIdentity can return present-but-empty nameComponents; displayName maps blank to nil so copy falls back to "your friend".
+- Screens listen for plusOnePendingChangesChanged so a friend's verdict updates open UI without a relaunch; the silent push still triggers the fetch.

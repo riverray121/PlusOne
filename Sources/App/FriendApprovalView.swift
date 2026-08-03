@@ -38,9 +38,11 @@ struct FriendPairingSection: View {
                     friendSync.resetPairing()
                 }
             case .paired:
-                Label("Paired with \(friendSync.ownerFriendName ?? "your friend")", systemImage: "person.2.fill")
+                Label(pairedLabel, systemImage: "person.2.fill")
                     .foregroundStyle(.green)
-                Button("Unpair friend", role: .destructive) {
+                Button("Invite another friend") { startPairing() }
+                    .disabled(isPreparing)
+                Button(friendSync.ownerFriendNames.count > 1 ? "Unpair friends" : "Unpair friend", role: .destructive) {
                     _ = proposeOrNotify(.unpairFriend, into: $queued)
                 }
             }
@@ -52,8 +54,14 @@ struct FriendPairingSection: View {
         } header: {
             Text("Friend approval")
         } footer: {
-            Text("When you try to loosen your protection, your friend gets asked first. If they approve, the change happens right away. If they say no, it doesn't happen. If they never answer, the delay timer decides.")
+            Text("Paired friends can approve your changes. While a change sits in Pending changes, you can send it to them: an approval makes it happen right away, a no throws it away, and no answer means the delay timer decides.")
         }
+    }
+
+    private var pairedLabel: String {
+        let names = friendSync.ownerFriendNames
+        guard !names.isEmpty else { return "Paired with your friend" }
+        return "Paired with \(ListFormatter.localizedString(byJoining: names))"
     }
 
     // The guard and flag stop double-taps from racing two share creations;
@@ -103,7 +111,7 @@ struct FriendInboxSection: View {
             } header: {
                 Text("Approve for \(friendSync.companionFriendName ?? "your friend")")
             } footer: {
-                Text("When \(friendSync.companionFriendName ?? "your friend") tries to loosen their protection, the request shows up here. Approve and it happens right away. Deny and nothing changes.")
+                Text("When \(friendSync.companionFriendName ?? "your friend") asks you to approve a change to their protection, it shows up here. Approve and it happens right away. Deny and nothing changes.")
             }
         }
     }
