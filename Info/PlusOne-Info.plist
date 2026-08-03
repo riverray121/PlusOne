@@ -22,6 +22,8 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>CKSharingSupported</key>
 	<true/>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>NSCameraUsageDescription</key>
 	<string>The camera verifies two people are present before unlocking a blocked app. Frames are analyzed on-device and never stored.</string>
 	<key>UIBackgroundModes</key>

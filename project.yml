@@ -21,6 +21,8 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.riverray.PlusOne
+        # iPhone-only: portrait capture UI; iPad multitasking would require all orientations.
+        TARGETED_DEVICE_FAMILY: 1
     sources:
       - Sources/App
       - Sources/Shared
@@ -47,6 +49,9 @@ targets:
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         UIBackgroundModes: [remote-notification]
         CKSharingSupported: true
+        # Only exempt encryption (HTTPS, CloudKit); skips the export compliance
+        # prompt on each App Store Connect upload.
+        ITSAppUsesNonExemptEncryption: false
     dependencies:
       - target: ShieldUIExtension
       - target: ShieldActionExtension
@@ -58,6 +63,8 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.riverray.PlusOne.ShieldUIExtension
+        # iPhone-only: portrait capture UI; iPad multitasking would require all orientations.
+        TARGETED_DEVICE_FAMILY: 1
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     sources:
       - Sources/ShieldUI
@@ -88,6 +95,8 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.riverray.PlusOne.ShieldActionExtension
+        # iPhone-only: portrait capture UI; iPad multitasking would require all orientations.
+        TARGETED_DEVICE_FAMILY: 1
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     sources:
       - Sources/ShieldAction
@@ -118,6 +127,8 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.riverray.PlusOne.MonitorExtension
+        # iPhone-only: portrait capture UI; iPad multitasking would require all orientations.
+        TARGETED_DEVICE_FAMILY: 1
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     sources:
       - Sources/Monitor
