@@ -52,7 +52,7 @@ struct FriendPairingSection: View {
         } header: {
             Text("Friend approval")
         } footer: {
-            Text("Weakening changes go to your friend: approved applies now, denied is discarded, unanswered falls back to the delay. Only requests and responses sync over iCloud.")
+            Text("When you try to weaken your protection, your friend gets asked first. If they approve, it happens right away. If they say no, it doesn't happen. If they never answer, the delay timer decides.")
         }
     }
 
@@ -103,7 +103,7 @@ struct FriendInboxSection: View {
             } header: {
                 Text("Approve for your friend")
             } footer: {
-                Text("Approving applies your friend's change immediately; denying discards it.")
+                Text("Your friend wants to change their protection. Approve and it happens right away. Deny and nothing changes.")
             }
         }
     }
