@@ -58,8 +58,10 @@ struct CaptureView: View {
     private var cameraView: some View {
         VStack(spacing: 16) {
             ZStack {
-                CameraPreview(session: faceCheck.session)
-                    .clipShape(RoundedRectangle(cornerRadius: 20))
+                CameraPreview(session: faceCheck.session) { orientation in
+                    faceCheck.updateInterfaceOrientation(orientation)
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 20))
                 if faceCheck.cameraUnavailable {
                     VStack(spacing: 8) {
                         Image(systemName: "video.slash")
@@ -210,20 +212,67 @@ struct CaptureView: View {
 }
 
 // Thin wrapper exposing the capture session's preview layer to SwiftUI.
+// Keeps the preview upright as the scene rotates (iPad supports all
+// orientations) and reports the orientation so frame analysis can match.
 struct CameraPreview: UIViewRepresentable {
     let session: AVCaptureSession
+    var onOrientationChange: ((UIInterfaceOrientation) -> Void)?
 
     final class PreviewView: UIView {
         override class var layerClass: AnyClass { AVCaptureVideoPreviewLayer.self }
         var previewLayer: AVCaptureVideoPreviewLayer { layer as! AVCaptureVideoPreviewLayer }
+        var onOrientationChange: ((UIInterfaceOrientation) -> Void)?
+        private var startObserver: NSObjectProtocol?
+
+        // The preview connection only exists once the session is configured,
+        // which happens off-main after the first layout; reapply then.
+        func observeSessionStart(_ session: AVCaptureSession) {
+            startObserver = NotificationCenter.default.addObserver(
+                forName: .AVCaptureSessionDidStartRunning, object: session, queue: .main
+            ) { [weak self] _ in self?.applyOrientation() }
+        }
+
+        deinit {
+            if let startObserver { NotificationCenter.default.removeObserver(startObserver) }
+        }
+
+        override func layoutSubviews() {
+            super.layoutSubviews()
+            applyOrientation()
+        }
+
+        private func applyOrientation() {
+            guard let orientation = window?.windowScene?.interfaceOrientation else { return }
+            onOrientationChange?(orientation)
+            guard let connection = previewLayer.connection else { return }
+            if #available(iOS 17.0, *) {
+                let angle: CGFloat
+                switch orientation {
+                case .portraitUpsideDown: angle = 270
+                case .landscapeLeft: angle = 180
+                case .landscapeRight: angle = 0
+                default: angle = 90
+                }
+                if connection.isVideoRotationAngleSupported(angle) {
+                    connection.videoRotationAngle = angle
+                }
+            } else if connection.isVideoOrientationSupported,
+                      let video = AVCaptureVideoOrientation(rawValue: orientation.rawValue) {
+                connection.videoOrientation = video
+            }
+        }
     }
 
     func makeUIView(context: Context) -> PreviewView {
         let view = PreviewView()
         view.previewLayer.session = session
         view.previewLayer.videoGravity = .resizeAspectFill
+        view.onOrientationChange = onOrientationChange
+        view.observeSessionStart(session)
         return view
     }
 
-    func updateUIView(_ uiView: PreviewView, context: Context) {}
+    func updateUIView(_ uiView: PreviewView, context: Context) {
+        uiView.onOrientationChange = onOrientationChange
+    }
 }

@@ -1,4 +1,5 @@
 import AVFoundation
+import UIKit
 import Vision
 
 // Live two-face verification. Pass requires `requiredFaces` faces, each large
@@ -54,6 +55,25 @@ final class FaceCheck: NSObject, ObservableObject {
     private var hasPassed = false
     // Face centers from the previous depth-path frame, for the drift gate.
     private var previousCenters: [CGPoint] = []
+    // EXIF orientation for the 2D path, matching the current interface
+    // orientation. Owned by processingQueue; the depth path works in buffer
+    // space and never reads it.
+    private var exifOrientation: CGImagePropertyOrientation = .leftMirrored
+
+    // Front-camera buffers are sensor-native landscape; map the interface
+    // orientation to how a captured face is rotated within them. Interface
+    // landscape names are the reverse of device landscape names, which is why
+    // interface landscapeLeft pairs with upMirrored.
+    func updateInterfaceOrientation(_ orientation: UIInterfaceOrientation) {
+        let exif: CGImagePropertyOrientation
+        switch orientation {
+        case .portraitUpsideDown: exif = .rightMirrored
+        case .landscapeLeft: exif = .upMirrored
+        case .landscapeRight: exif = .downMirrored
+        default: exif = .leftMirrored
+        }
+        processingQueue.async { self.exifOrientation = exif }
+    }
 
     func start() {
         processingQueue.async { [self] in
@@ -371,10 +391,11 @@ extension FaceCheck: AVCaptureDataOutputSynchronizerDelegate {
 extension FaceCheck: AVCaptureVideoDataOutputSampleBufferDelegate {
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
-        // iPhone front camera delivers rotated portrait frames; a Mac's camera
-        // delivers upright landscape ones.
+        // A Mac's camera delivers upright landscape frames regardless of
+        // window arrangement; on iPhone and iPad the rotation follows the
+        // interface orientation.
         let orientation: CGImagePropertyOrientation =
-            ProcessInfo.processInfo.isiOSAppOnMac ? .upMirrored : .leftMirrored
+            ProcessInfo.processInfo.isiOSAppOnMac ? .upMirrored : exifOrientation
         detect2D(in: pixelBuffer, orientation: orientation)
     }
 }
