@@ -149,12 +149,7 @@ struct HomeView: View {
         } header: {
             Text("Blocking")
         } footer: {
-            Text("""
-            Selfie-unlock blocks open after a selfie with two people.
-            Hard blocks can never be opened.
-            Time limits give their apps a budget of minutes each hour or day.
-            Scheduled breaks let you use chosen apps at set times without a selfie.
-            """)
+            Text("Four ways to block apps and websites. Each screen explains how it works.")
         }
     }
 

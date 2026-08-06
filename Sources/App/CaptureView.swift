@@ -129,7 +129,7 @@ struct CaptureView: View {
                 .foregroundStyle(.green)
             Text("You're in")
                 .font(.largeTitle.bold())
-            Text("Return to your app. It's unlocked for \(pluralMinutes(SharedStore.shared.durationMinutes)) of use, then locks itself.")
+            Text("Return to your app. It's unlocked for \(pluralMinutes(SessionManager.shared.rule(containing: target)?.durationMinutes ?? 5)) of use, then locks itself.")
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
             Spacer()

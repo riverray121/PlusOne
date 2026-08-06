@@ -32,7 +32,7 @@ struct ScheduledBreaksView: View {
                     Label("Add break", systemImage: "plus")
                 }
             } footer: {
-                Text("During a break, the apps and websites in it can be opened without a selfie. Breaks repeat every day at the time you set. Apps that are hard-blocked or have used up their time limit stay blocked even during a break.")
+                Text("A break lets you use the apps and websites you add to it without a selfie. It repeats every day at the time you set. Hard blocks and used-up time limits stay blocked.")
             }
         }
         .navigationTitle("Scheduled breaks")
@@ -97,11 +97,7 @@ struct BreakEditView: View {
             ) { _ in }
 
             Section {
-                // The compact date picker's capsule makes its row taller than
-                // the menu pickers below; capping its height lets the row
-                // settle to the same standard height.
                 DatePicker("Starts at", selection: startTime, displayedComponents: .hourAndMinute)
-                    .frame(maxHeight: 36)
                 Picker("Window", selection: $rule.windowMinutes) {
                     ForEach(windowOptions, id: \.self) { Text(hoursOrMinutesLabel($0)) }
                 }

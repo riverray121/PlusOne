@@ -121,6 +121,20 @@ struct ProtectionGate {
             return current > 0 && (cap == 0 || cap > current)
         case .setAdultFilter(let on):
             return !on && store.adultFilterEnabled
+        case .upsertSelfieRule(let rule):
+            // A new rule adds blocking and is immediate. On an existing rule,
+            // any change that grants more or easier unlocks queues.
+            guard let existing = store.selfieRules.first(where: { $0.id == rule.id }) else {
+                return false
+            }
+            let capWeakened = existing.dailyCap > 0
+                && (rule.dailyCap == 0 || rule.dailyCap > existing.dailyCap)
+            return rule.durationMinutes > existing.durationMinutes
+                || rule.cooldownMinutes < existing.cooldownMinutes
+                || capWeakened
+                || existing.selection.subtracting(rule.selection).itemCount > 0
+        case .deleteSelfieRule(let id):
+            return store.selfieRules.contains { $0.id == id }
         case .upsertTimeLimitRule(let rule):
             guard let existing = store.timeLimitRules.first(where: { $0.id == rule.id }) else {
                 return false
@@ -174,17 +188,45 @@ struct ProtectionGate {
                 }
             }
         case .removeSelfieItems(let removed):
-            store.selection = store.selection.subtracting(removed)
+            store.selfieRules = store.selfieRules.map { rule in
+                var updated = rule
+                updated.selection = rule.selection.subtracting(removed)
+                return updated
+            }
             SessionManager.shared.refreshShields()
         case .removeHardItems(let removed):
             store.hardSelection = store.hardSelection.subtracting(removed)
             SessionManager.shared.refreshShields()
         case .setDuration(let minutes):
-            store.durationMinutes = minutes
+            store.selfieRules = store.selfieRules.map { rule in
+                var updated = rule
+                updated.durationMinutes = minutes
+                return updated
+            }
         case .setCooldown(let minutes):
-            store.cooldownMinutes = minutes
+            store.selfieRules = store.selfieRules.map { rule in
+                var updated = rule
+                updated.cooldownMinutes = minutes
+                return updated
+            }
         case .setDailyCap(let cap):
-            store.dailyCap = cap
+            store.selfieRules = store.selfieRules.map { rule in
+                var updated = rule
+                updated.dailyCap = cap
+                return updated
+            }
+        case .upsertSelfieRule(let rule):
+            var rules = store.selfieRules
+            if let index = rules.firstIndex(where: { $0.id == rule.id }) {
+                rules[index] = rule
+            } else {
+                rules.append(rule)
+            }
+            store.selfieRules = rules
+            SessionManager.shared.refreshShields()
+        case .deleteSelfieRule(let id):
+            store.selfieRules = store.selfieRules.filter { $0.id != id }
+            SessionManager.shared.refreshShields()
         case .setAdultFilter(let on):
             store.adultFilterEnabled = on
             SessionManager.shared.refreshShields()
@@ -256,6 +298,10 @@ struct ProtectionGate {
             return cap == 0 ? "Turn daily cap off" : "Daily cap to \(cap) sessions"
         case .setAdultFilter:
             return "Turn adult website filter off"
+        case .upsertSelfieRule(let rule):
+            return "Selfie-unlock block: \(pluralItems(rule.itemCount)), \(rule.durationMinutes) min per pass"
+        case .deleteSelfieRule:
+            return "Delete a selfie-unlock block"
         case .upsertTimeLimitRule(let rule):
             return "Time limit to \(rule.minutes) min / \(rule.period.label)"
         case .deleteTimeLimitRule:

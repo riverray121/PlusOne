@@ -89,9 +89,9 @@ struct OnboardingView: View {
             .familyActivityPicker(isPresented: $showPicker, selection: $pickerBuffer)
             .onChange(of: showPicker) { presented in
                 if presented {
-                    pickerBuffer = appState.selection
+                    pickerBuffer = appState.initialSelfieSelection
                 } else {
-                    appState.selection = pickerBuffer
+                    appState.setInitialSelfieSelection(pickerBuffer)
                 }
             }
             // A relaunch mid-onboarding starts the grant flags at false;

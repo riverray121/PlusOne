@@ -9,17 +9,21 @@ struct ShieldController {
 
     private let store = ManagedSettingsStore(named: .init(AppGroup.managedSettingsStoreName))
 
-    // Shields the full selection, minus excluded (unlocked) items.
+    // Shields every selfie rule's selection, minus excluded (unlocked) items.
     // Category-shielded items are excluded via the policy's `except` sets.
     func applyShields(excluding excluded: [UnlockTarget] = []) {
-        let selection = SharedStore.shared.selection
         let hard = SharedStore.shared.hardSelection
 
-        var apps = selection.applicationTokens
-        var domains = selection.webDomainTokens
-        var categories = selection.categoryTokens
+        var apps: Set<ApplicationToken> = []
+        var domains: Set<WebDomainToken> = []
+        var categories: Set<ActivityCategoryToken> = []
         var exceptApps: Set<ApplicationToken> = []
         var exceptDomains: Set<WebDomainToken> = []
+        for rule in SharedStore.shared.selfieRules {
+            apps.formUnion(rule.selection.applicationTokens)
+            domains.formUnion(rule.selection.webDomainTokens)
+            categories.formUnion(rule.selection.categoryTokens)
+        }
 
         for target in excluded {
             switch target {

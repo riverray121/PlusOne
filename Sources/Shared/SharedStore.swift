@@ -31,9 +31,10 @@ struct SharedStore {
         static let friendPaired = "friendPaired"
         static let pendingUnlock = "pendingUnlock"
         static let activeSessions = "activeSessions"
-        static let sessionsToday = "sessionsToday"
+        static let selfieRules = "selfieRules"
+        static let sessionsTodayById = "sessionsTodayById"
         static let sessionsDay = "sessionsDay"
-        static let lastSessionEnd = "lastSessionEnd"
+        static let sessionEnds = "sessionEnds"
     }
 
     // Codable values are stored as JSON. A missing or unreadable value reads
@@ -51,11 +52,27 @@ struct SharedStore {
         defaults.set(try? encoder.encode(value), forKey: key)
     }
 
-    // MARK: Selection
+    // MARK: Selfie-unlock rules
 
-    var selection: FamilyActivitySelection {
-        get { decoded(Key.selection) ?? FamilyActivitySelection() }
-        nonmutating set { encode(newValue, forKey: Key.selection) }
+    // Missing key means the suite still holds the single-selection legacy
+    // layout; it reads as one rule carrying the legacy global settings, under
+    // a fixed id so per-rule counters stay stable. The first write persists
+    // real rules and ends the synthesis.
+    var selfieRules: [SelfieRule] {
+        get {
+            if let rules: [SelfieRule] = decoded(Key.selfieRules) { return rules }
+            let legacy = selection
+            guard legacy.itemCount > 0 else { return [] }
+            var rule = SelfieRule()
+            rule.id = SelfieRule.legacyId
+            rule.selection = legacy
+            rule.durationMinutes = durationMinutes
+            rule.cooldownMinutes = cooldownMinutes
+            rule.dailyCap = dailyCap
+            rule.warnMinutes = sessionWarnMinutes
+            return [rule]
+        }
+        nonmutating set { encode(newValue, forKey: Key.selfieRules) }
     }
 
     var protectionEnabled: Bool {
@@ -63,7 +80,15 @@ struct SharedStore {
         nonmutating set { defaults.set(newValue, forKey: Key.protectionEnabled) }
     }
 
-    // MARK: Settings
+    // MARK: Legacy single-selection layout
+
+    // Read only to synthesize selfieRules and to apply queued changes
+    // recorded against the global settings.
+
+    var selection: FamilyActivitySelection {
+        get { decoded(Key.selection) ?? FamilyActivitySelection() }
+        nonmutating set { encode(newValue, forKey: Key.selection) }
+    }
 
     // Minutes of usage granted per pass.
     var durationMinutes: Int {
@@ -84,11 +109,12 @@ struct SharedStore {
     }
 
     // Minutes-remaining mark for the session warning notification. 0 = off.
-    // Applies to sessions started after a change.
     var sessionWarnMinutes: Int {
         get { defaults.object(forKey: Key.sessionWarnMinutes) as? Int ?? 1 }
         nonmutating set { defaults.set(newValue, forKey: Key.sessionWarnMinutes) }
     }
+
+    // MARK: Settings
 
     // Apple's machine-learned adult-content web filter. Hard block, no
     // selfie unlock.
@@ -184,25 +210,31 @@ struct SharedStore {
         nonmutating set { encode(newValue, forKey: Key.activeSessions) }
     }
 
-    var lastSessionEnd: Date? {
-        get { defaults.object(forKey: Key.lastSessionEnd) as? Date }
-        nonmutating set { defaults.set(newValue, forKey: Key.lastSessionEnd) }
+    // When each rule's last session ended, keyed by rule id; drives per-rule
+    // cooldowns.
+    var sessionEnds: [String: Date] {
+        get { decoded(Key.sessionEnds) ?? [:] }
+        nonmutating set { encode(newValue, forKey: Key.sessionEnds) }
     }
 
-    // MARK: Daily counter
+    // MARK: Daily counters
 
-    // Session count is scoped to a day string so it resets at midnight without
-    // needing a scheduled job.
-    func sessionsToday(now: Date = Date()) -> Int {
+    // Per-rule session counts, scoped to a day string so they reset at
+    // midnight without needing a scheduled job.
+    func sessionsToday(ruleId: UUID, now: Date = Date()) -> Int {
         guard defaults.string(forKey: Key.sessionsDay) == Self.dayString(now) else { return 0 }
-        return defaults.integer(forKey: Key.sessionsToday)
+        let counts: [String: Int] = decoded(Key.sessionsTodayById) ?? [:]
+        return counts[ruleId.uuidString] ?? 0
     }
 
-    func incrementSessionsToday(now: Date = Date()) {
+    func incrementSessionsToday(ruleId: UUID, now: Date = Date()) {
         let day = Self.dayString(now)
-        let count = defaults.string(forKey: Key.sessionsDay) == day ? defaults.integer(forKey: Key.sessionsToday) : 0
+        var counts: [String: Int] = defaults.string(forKey: Key.sessionsDay) == day
+            ? (decoded(Key.sessionsTodayById) ?? [:])
+            : [:]
+        counts[ruleId.uuidString, default: 0] += 1
         defaults.set(day, forKey: Key.sessionsDay)
-        defaults.set(count + 1, forKey: Key.sessionsToday)
+        encode(counts, forKey: Key.sessionsTodayById)
     }
 
     private static func dayString(_ date: Date) -> String {
@@ -220,4 +252,43 @@ struct UnlockSession: Codable {
     let startedAt: Date
     let usageMinutes: Int
     let wallClockEnd: Date
+    // Rule that granted the session; nil when no rule contained the target.
+    let ruleId: UUID?
+    // Warning mark captured at grant so mid-session edits don't shift it.
+    let warnMinutes: Int
+
+    init(
+        id: String,
+        target: UnlockTarget,
+        startedAt: Date,
+        usageMinutes: Int,
+        wallClockEnd: Date,
+        ruleId: UUID?,
+        warnMinutes: Int
+    ) {
+        self.id = id
+        self.target = target
+        self.startedAt = startedAt
+        self.usageMinutes = usageMinutes
+        self.wallClockEnd = wallClockEnd
+        self.ruleId = ruleId
+        self.warnMinutes = warnMinutes
+    }
+
+    // ruleId and warnMinutes decode leniently so sessions persisted without
+    // the keys still load.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        target = try container.decode(UnlockTarget.self, forKey: .target)
+        startedAt = try container.decode(Date.self, forKey: .startedAt)
+        usageMinutes = try container.decode(Int.self, forKey: .usageMinutes)
+        wallClockEnd = try container.decode(Date.self, forKey: .wallClockEnd)
+        ruleId = try container.decodeIfPresent(UUID.self, forKey: .ruleId)
+        warnMinutes = try container.decodeIfPresent(Int.self, forKey: .warnMinutes) ?? 1
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, target, startedAt, usageMinutes, wallClockEnd, ruleId, warnMinutes
+    }
 }

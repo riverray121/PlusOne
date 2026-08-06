@@ -32,19 +32,24 @@ struct SessionManager {
 
     // MARK: Gates
 
+    // First rule whose selection contains the target; stored order breaks
+    // ties so an older rule keeps governing an item that appears in two.
+    func rule(containing target: UnlockTarget) -> SelfieRule? {
+        store.selfieRules.first { $0.contains(target) }
+    }
+
     func gateCheck(for target: UnlockTarget, now: Date = Date()) -> GateResult {
         let sessions = store.activeSessions.filter { $0.wallClockEnd > now }
         if sessions.contains(where: { $0.target == target }) {
             return .sessionActive
         }
-        let cooldown = store.cooldownMinutes
-        if cooldown > 0, let lastEnd = store.lastSessionEnd {
-            let readyAt = lastEnd.addingTimeInterval(TimeInterval(cooldown * 60))
+        guard let rule = rule(containing: target) else { return .allowed }
+        if rule.cooldownMinutes > 0, let lastEnd = store.sessionEnds[rule.id.uuidString] {
+            let readyAt = lastEnd.addingTimeInterval(TimeInterval(rule.cooldownMinutes * 60))
             if readyAt > now { return .coolingDown(remaining: readyAt.timeIntervalSince(now)) }
         }
-        let cap = store.dailyCap
-        if cap > 0, store.sessionsToday(now: now) >= cap {
-            return .capReached(cap: cap)
+        if rule.dailyCap > 0, store.sessionsToday(ruleId: rule.id, now: now) >= rule.dailyCap {
+            return .capReached(cap: rule.dailyCap)
         }
         return .allowed
     }
@@ -52,9 +57,10 @@ struct SessionManager {
     // MARK: Grant
 
     // Unshields the target and arms DeviceActivity: a usage threshold at the
-    // configured duration, plus an interval end as the re-lock backstop.
+    // rule's duration, plus an interval end as the re-lock backstop.
     func startSession(for target: UnlockTarget, now: Date = Date()) throws {
-        let minutes = store.durationMinutes
+        let rule = rule(containing: target)
+        let minutes = rule?.durationMinutes ?? 5
         let intervalMinutes = max(Self.minIntervalMinutes, minutes + 1)
         let end = now.addingTimeInterval(TimeInterval(intervalMinutes * 60))
         let id = UUID().uuidString
@@ -81,7 +87,7 @@ struct SessionManager {
                 threshold: DateComponents(minute: minutes)
             )
         ]
-        let warn = store.sessionWarnMinutes
+        let warn = rule?.warnMinutes ?? 1
         if warn > 0, minutes - warn >= 1 {
             events[Self.warnEvent] = DeviceActivityEvent(
                 applications: apps,
@@ -98,11 +104,15 @@ struct SessionManager {
             target: target,
             startedAt: now,
             usageMinutes: minutes,
-            wallClockEnd: end
+            wallClockEnd: end,
+            ruleId: rule?.id,
+            warnMinutes: warn
         ))
         store.activeSessions = sessions
         store.pendingUnlock = nil
-        store.incrementSessionsToday(now: now)
+        if let rule {
+            store.incrementSessionsToday(ruleId: rule.id, now: now)
+        }
         refreshShields(now: now)
     }
 
@@ -112,11 +122,11 @@ struct SessionManager {
     // interval end.
     func endSession(id: String, now: Date = Date()) {
         var sessions = store.activeSessions
-        guard sessions.contains(where: { $0.id == id }) else { return }
+        guard let session = sessions.first(where: { $0.id == id }) else { return }
         center.stopMonitoring([activity(for: id)])
         sessions.removeAll { $0.id == id }
         store.activeSessions = sessions
-        store.lastSessionEnd = now
+        markSessionEnd(session, now: now)
         refreshShields(now: now)
     }
 
@@ -134,8 +144,16 @@ struct SessionManager {
         guard !sessions.isEmpty else { return }
         center.stopMonitoring(sessions.map { activity(for: $0.id) })
         store.activeSessions = []
-        store.lastSessionEnd = now
+        for session in sessions { markSessionEnd(session, now: now) }
         refreshShields(now: now)
+    }
+
+    // Stamps the rule's cooldown clock.
+    private func markSessionEnd(_ session: UnlockSession, now: Date) {
+        guard let ruleId = session.ruleId else { return }
+        var ends = store.sessionEnds
+        ends[ruleId.uuidString] = now
+        store.sessionEnds = ends
     }
 
     // Shields everything except items with a live session. Callers re-apply

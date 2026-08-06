@@ -6,14 +6,14 @@ import UIKit
 // items and spent time limits get variants with no unlock path.
 class ShieldConfigurationProvider: ShieldConfigurationDataSource {
 
-    private func unlockable() -> ShieldConfiguration {
+    private func unlockable(minutes: Int) -> ShieldConfiguration {
         ShieldConfiguration(
             backgroundBlurStyle: .systemUltraThinMaterialDark,
             backgroundColor: UIColor.black.withAlphaComponent(0.4),
             icon: UIImage(systemName: "person.2.fill"),
             title: .init(text: "Blocked by PlusOne", color: .white),
             subtitle: .init(
-                text: "Take a selfie with someone to unlock \(pluralMinutes(SharedStore.shared.durationMinutes)).",
+                text: "Take a selfie with someone to unlock \(pluralMinutes(minutes)).",
                 color: UIColor.white.withAlphaComponent(0.8)
             ),
             primaryButtonLabel: .init(text: "Unlock with a selfie", color: .black),
@@ -84,23 +84,32 @@ class ShieldConfigurationProvider: ShieldConfigurationDataSource {
         return nil
     }
 
+    // Duration shown on the shield comes from the rule governing the token.
+    private func unlockMinutes(_ token: ApplicationToken?) -> Int {
+        token.flatMap { t in SharedStore.shared.selfieRules.first { $0.contains(t) } }?.durationMinutes ?? 5
+    }
+
+    private func unlockMinutes(_ token: WebDomainToken?) -> Int {
+        token.flatMap { t in SharedStore.shared.selfieRules.first { $0.contains(t) } }?.durationMinutes ?? 5
+    }
+
     override func configuration(shielding application: Application) -> ShieldConfiguration {
-        lockedConfiguration(application.token) ?? unlockable()
+        lockedConfiguration(application.token) ?? unlockable(minutes: unlockMinutes(application.token))
     }
 
     override func configuration(shielding application: Application, in category: ActivityCategory) -> ShieldConfiguration {
         lockedConfiguration(application.token)
             ?? lockedConfiguration(category.token)
-            ?? unlockable()
+            ?? unlockable(minutes: unlockMinutes(application.token))
     }
 
     override func configuration(shielding webDomain: WebDomain) -> ShieldConfiguration {
-        lockedConfiguration(webDomain.token) ?? unlockable()
+        lockedConfiguration(webDomain.token) ?? unlockable(minutes: unlockMinutes(webDomain.token))
     }
 
     override func configuration(shielding webDomain: WebDomain, in category: ActivityCategory) -> ShieldConfiguration {
         lockedConfiguration(webDomain.token)
             ?? lockedConfiguration(category.token)
-            ?? unlockable()
+            ?? unlockable(minutes: unlockMinutes(webDomain.token))
     }
 }

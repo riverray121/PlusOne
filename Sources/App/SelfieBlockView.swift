@@ -1,75 +1,38 @@
 import SwiftUI
 import FamilyControls
 
-// Selfie-unlock blocks: the picker selection plus the session settings that
-// only govern selfie unlocks (duration, cooldown, daily cap).
+// Selfie-unlock rules: each rule blocks its own selection behind the selfie
+// check, with its own duration, cooldown, cap, and warning. The editor is
+// pushed, never sheeted: FamilyActivityPicker presented over a sheet pulls
+// the whole sheet down when it closes, losing the edit.
 struct SelfieBlockView: View {
-    @EnvironmentObject private var appState: AppState
-    @State private var duration = SharedStore.shared.durationMinutes
-    @State private var cooldown = SharedStore.shared.cooldownMinutes
-    @State private var cap = SharedStore.shared.dailyCap
-    @State private var warn = SharedStore.shared.sessionWarnMinutes
+    @State private var rules = SharedStore.shared.selfieRules
     @State private var queued: QueuedNotice?
-
-    private let durationOptions = [1, 2, 3, 5, 10, 15, 20, 30, 45, 60]
-    private let cooldownOptions = [0, 5, 15, 30, 60, 120]
-    private let capOptions = Array(0...10)
 
     var body: some View {
         List {
-            // appState.selection's observer persists and re-shields on every
-            // assignment, so commit needs no extra work here. Removal is a
-            // weakening: the gate decides whether it applies or queues.
-            SelectionEditor(
-                selection: $appState.selection,
-                footer: "Blocked until a selfie shows at least two people, then unlocked for the duration below. Swipe an item left to remove it.",
-                removal: { removed in
-                    proposeOrNotify(.removeSelfieItems(removed), into: $queued)
-                }
-            ) { _ in }
-
             Section {
-                Picker("Unlock duration", selection: $duration) {
-                    ForEach(durationOptions, id: \.self) { Text("\($0) min") }
-                }
-                .onChange(of: duration) { minutes in
-                    if !proposeOrNotify(.setDuration(minutes), into: $queued) {
-                        duration = SharedStore.shared.durationMinutes
+                ForEach(rules) { rule in
+                    NavigationLink {
+                        SelfieRuleEditView(rule: rule, isNew: false, onSave: save)
+                    } label: {
+                        HStack {
+                            Label(pluralItems(rule.itemCount), systemImage: "person.2.fill")
+                            Spacer()
+                            Text("\(rule.durationMinutes) min")
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
+                .onDelete(perform: delete)
 
-                Picker("Cooldown", selection: $cooldown) {
-                    ForEach(cooldownOptions, id: \.self) {
-                        Text($0 == 0 ? "Off" : "\($0) min")
-                    }
-                }
-                .onChange(of: cooldown) { minutes in
-                    if !proposeOrNotify(.setCooldown(minutes), into: $queued) {
-                        cooldown = SharedStore.shared.cooldownMinutes
-                    }
-                }
-
-                Picker("Daily cap", selection: $cap) {
-                    ForEach(capOptions, id: \.self) {
-                        Text($0 == 0 ? "Off" : "\($0) sessions")
-                    }
-                }
-                .onChange(of: cap) { sessions in
-                    if !proposeOrNotify(.setDailyCap(sessions), into: $queued) {
-                        cap = SharedStore.shared.dailyCap
-                    }
-                }
-
-                Picker("Warn when minutes left", selection: $warn) {
-                    ForEach(warnMinuteOptions, id: \.self) {
-                        Text($0 == 0 ? "Off" : "\($0) min")
-                    }
-                }
-                .onChange(of: warn) { minutes in
-                    SharedStore.shared.sessionWarnMinutes = minutes
+                NavigationLink {
+                    SelfieRuleEditView(rule: SelfieRule(), isNew: true, onSave: save)
+                } label: {
+                    Label("Add block", systemImage: "plus")
                 }
             } footer: {
-                Text("Duration is minutes of usage granted per selfie pass and applies to the next session. Cooldown is the wait required between sessions. The cap is the maximum sessions per day. The warning notifies when a session has this many minutes remaining; it is skipped when the duration is at or under the warning value.")
+                Text("A selfie with two people unlocks the item you tapped. Each block has its own unlock duration, cooldown, and daily cap.")
             }
 
             Section {
@@ -80,12 +43,85 @@ struct SelfieBlockView: View {
         }
         .navigationTitle("Selfie-unlock blocks")
         .navigationBarTitleDisplayMode(.inline)
-        // Pending applies elsewhere can change these; never show stale values.
-        .onAppear {
-            duration = SharedStore.shared.durationMinutes
-            cooldown = SharedStore.shared.cooldownMinutes
-            cap = SharedStore.shared.dailyCap
-        }
+        .onAppear { rules = SharedStore.shared.selfieRules }
         .queuedChangeAlert($queued)
+    }
+
+    // New rules add blocking and apply immediately; edits that grant more or
+    // easier unlocks are weakenings the gate may queue.
+    private func save(_ saved: SelfieRule) {
+        if proposeOrNotify(.upsertSelfieRule(saved), into: $queued) {
+            rules = SharedStore.shared.selfieRules
+        }
+    }
+
+    private func delete(at offsets: IndexSet) {
+        for rule in offsets.map({ rules[$0] }) {
+            _ = proposeOrNotify(.deleteSelfieRule(rule.id), into: $queued)
+        }
+        rules = SharedStore.shared.selfieRules
+    }
+}
+
+struct SelfieRuleEditView: View {
+    @Environment(\.dismiss) private var dismiss
+    @State var rule: SelfieRule
+    let isNew: Bool
+    let onSave: (SelfieRule) -> Void
+
+    private let durationOptions = [1, 2, 3, 5, 10, 15, 20, 30, 45, 60]
+    private let cooldownOptions = [0, 5, 15, 30, 60, 120]
+    private let capOptions = Array(0...10)
+
+    var body: some View {
+        List {
+            // The rule is local until Save, so commit needs no extra work.
+            SelectionEditor(
+                selection: $rule.selection,
+                footer: "Swipe an item left to remove it."
+            ) { _ in }
+
+            Section {
+                Picker("Unlock duration", selection: $rule.durationMinutes) {
+                    ForEach(durationOptions, id: \.self) { Text("\($0) min") }
+                }
+                Picker("Cooldown", selection: $rule.cooldownMinutes) {
+                    ForEach(cooldownOptions, id: \.self) {
+                        Text($0 == 0 ? "Off" : "\($0) min")
+                    }
+                }
+                Picker("Daily cap", selection: $rule.dailyCap) {
+                    ForEach(capOptions, id: \.self) {
+                        Text($0 == 0 ? "Off" : "\($0) sessions")
+                    }
+                }
+                Picker("Warn when minutes left", selection: $rule.warnMinutes) {
+                    ForEach(warnMinuteOptions, id: \.self) {
+                        Text($0 == 0 ? "Off" : "\($0) min")
+                    }
+                }
+            } footer: {
+                Text("Each selfie pass unlocks the tapped item for the duration. Cooldown is the wait between unlocks, and the daily cap limits how many you get per day. The warning notifies you when that many minutes are left in a session.")
+            }
+        }
+        .navigationTitle(isNew ? "New block" : "Edit block")
+        .navigationBarTitleDisplayMode(.inline)
+        // Leaving is an explicit choice: Save or Cancel, no back button, so
+        // edits can't be silently dropped.
+        .navigationBarBackButtonHidden(true)
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Cancel") { dismiss() }
+            }
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Save") {
+                    onSave(rule)
+                    dismiss()
+                }
+                .bold()
+                .tint(.blue)
+                .disabled(rule.itemCount == 0)
+            }
+        }
     }
 }

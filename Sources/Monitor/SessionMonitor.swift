@@ -63,10 +63,11 @@ class SessionMonitor: DeviceActivityMonitor {
         guard let id = sessionId(from: activity) else { return }
         switch event.rawValue {
         case AppGroup.sessionWarnEventName:
+            let warn = SharedStore.shared.activeSessions.first { $0.id == id }?.warnMinutes ?? 1
             Notifier.post(
                 id: AppGroup.sessionWarningNotificationId,
                 title: "Session ending soon",
-                body: "You have \(pluralMinutes(SharedStore.shared.sessionWarnMinutes)) left on this unlock."
+                body: "You have \(pluralMinutes(warn)) left on this unlock."
             )
         case AppGroup.usageEventName:
             SessionManager.shared.endSession(id: id)

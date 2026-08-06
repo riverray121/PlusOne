@@ -7,6 +7,9 @@ struct PendingChange: Codable, Identifiable {
     // Target values are captured at proposal time. Selection kinds carry the
     // removed tokens as a diff so applying late cannot clobber items added in
     // the meantime.
+    // removeSelfieItems, setDuration, setCooldown, and setDailyCap are only
+    // decodable from queues written against the single-selection layout; no
+    // surface proposes them, and applying one affects every selfie rule.
     enum Kind: Codable {
         case setProtection(Bool)
         case removeSelfieItems(FamilyActivitySelection)
@@ -14,6 +17,8 @@ struct PendingChange: Codable, Identifiable {
         case setDuration(Int)
         case setCooldown(Int)
         case setDailyCap(Int)
+        case upsertSelfieRule(SelfieRule)
+        case deleteSelfieRule(UUID)
         case setAdultFilter(Bool)
         case upsertTimeLimitRule(TimeLimitRule)
         case deleteTimeLimitRule(UUID)
@@ -71,6 +76,8 @@ struct PendingChange: Codable, Identifiable {
         case .setDuration: return "duration"
         case .setCooldown: return "cooldown"
         case .setDailyCap: return "dailyCap"
+        case .upsertSelfieRule(let rule): return "selfie-\(rule.id)"
+        case .deleteSelfieRule(let id): return "selfie-\(id)"
         case .setAdultFilter: return "adultFilter"
         case .upsertTimeLimitRule(let rule): return "rule-\(rule.id)"
         case .deleteTimeLimitRule(let id): return "rule-\(id)"

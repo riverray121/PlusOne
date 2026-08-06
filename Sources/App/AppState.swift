@@ -10,12 +10,6 @@ final class AppState: ObservableObject {
     @Published var onboarded: Bool {
         didSet { UserDefaults.standard.set(onboarded, forKey: "onboarded") }
     }
-    @Published var selection: FamilyActivitySelection {
-        didSet {
-            store.selection = selection
-            if protectionEnabled { ShieldController.shared.applyShields() }
-        }
-    }
     // Mirror only; every mutation goes through setProtection so the gate can
     // defer weakening. ProtectionGate owns the side effects.
     @Published var protectionEnabled: Bool
@@ -27,10 +21,30 @@ final class AppState: ObservableObject {
 
     init() {
         onboarded = UserDefaults.standard.bool(forKey: "onboarded")
-        selection = store.selection
         protectionEnabled = store.protectionEnabled
         pendingUnlock = store.pendingUnlock
         activeSessions = store.activeSessions
+    }
+
+    // Onboarding's initial pick becomes the first selfie-unlock rule, with
+    // default settings.
+    func setInitialSelfieSelection(_ selection: FamilyActivitySelection) {
+        var rules = store.selfieRules
+        if var first = rules.first {
+            first.selection = selection
+            rules[0] = first
+        } else {
+            var rule = SelfieRule()
+            rule.selection = selection
+            rules = [rule]
+        }
+        store.selfieRules = rules
+        if protectionEnabled { ShieldController.shared.applyShields() }
+        objectWillChange.send()
+    }
+
+    var initialSelfieSelection: FamilyActivitySelection {
+        store.selfieRules.first?.selection ?? FamilyActivitySelection()
     }
 
     // Turning protection on is always immediate; turning it off is a
@@ -54,10 +68,6 @@ final class AppState: ObservableObject {
         pendingUnlock = store.pendingUnlock
         activeSessions = store.activeSessions
         protectionEnabled = store.protectionEnabled
-        // Guarded: assigning selection re-persists and re-shields via didSet.
-        if selection != store.selection {
-            selection = store.selection
-        }
         if let target = pendingUnlock, captureRequest == nil {
             captureRequest = CaptureRequest(target: target)
         }
@@ -74,7 +84,7 @@ final class AppState: ObservableObject {
     }
 
     var selfieBlockItemCount: Int {
-        selection.itemCount
+        store.selfieRules.reduce(0) { $0 + $1.itemCount }
     }
 }
 
