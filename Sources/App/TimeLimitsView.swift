@@ -32,7 +32,7 @@ struct TimeLimitsView: View {
                     Label("Add limit", systemImage: "plus")
                 }
             } footer: {
-                Text("Each limit is a pool of minutes shared by its apps and websites. When it runs out they block with no unlock until the hour or day rolls over. Editing a limit restarts its count for the current period.")
+                Text("A shared pool of minutes for its items. When it runs out they block until the hour or day rolls over. Edits restart the current period's count.")
             }
         }
         .navigationTitle("Time limits")
@@ -73,7 +73,7 @@ struct TimeLimitEditView: View {
             // The rule is local until Save, so commit needs no extra work.
             SelectionEditor(
                 selection: $rule.selection,
-                footer: "Everything in this limit shares its pool of minutes. Swipe an item left to remove it."
+                footer: "Swipe an item left to remove it."
             ) { _ in }
 
             Section {
@@ -93,7 +93,7 @@ struct TimeLimitEditView: View {
                     }
                 }
             } footer: {
-                Text("Budgets reset on the clock: hourly limits at the top of each hour, daily limits at midnight. The warning notifies when this limit has that many minutes remaining; it is skipped when the limit is at or under the warning value.")
+                Text("Budgets reset on the clock: top of the hour, or midnight. The warning fires at that many minutes left.")
             }
         }
         .navigationTitle(isNew ? "New limit" : "Edit limit")

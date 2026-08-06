@@ -132,13 +132,15 @@ struct ProtectionGate {
             return store.timeLimitRules.contains { $0.id == id }
         case .upsertBreakRule(let rule):
             // Inverse of time limits: a break grants free time, so creating
-            // one, adding minutes or items, or moving the start weakens. A
-            // start-time move must queue because an instant move re-arms the
-            // schedule and would grant a second window the same day.
+            // one, adding minutes, window, or items, or moving the start
+            // weakens. A start-time move must queue because an instant move
+            // re-arms the schedule and would grant a second window the same
+            // day.
             guard let existing = store.breakRules.first(where: { $0.id == rule.id }) else {
                 return true
             }
             return rule.minutes > existing.minutes
+                || rule.windowMinutes > existing.windowMinutes
                 || rule.startMinuteOfDay != existing.startMinuteOfDay
                 || rule.selection.subtracting(existing.selection).itemCount > 0
         case .deleteBreakRule:

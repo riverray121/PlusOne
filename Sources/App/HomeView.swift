@@ -149,7 +149,12 @@ struct HomeView: View {
         } header: {
             Text("Blocking")
         } footer: {
-            Text("Selfie-unlock blocks open after a selfie with at least two people. Hard blocks never open. Time limits grant a budget of minutes per hour or day. Scheduled breaks open chosen items at set times with no selfie.")
+            Text("""
+            Selfie-unlock: opens after a two-person selfie.
+            Hard blocks: never open.
+            Time limits: a budget of minutes per hour or day.
+            Breaks: free minutes at set times.
+            """)
         }
     }
 
@@ -166,7 +171,7 @@ struct HomeView: View {
                 }
             }
         } footer: {
-            Text("Changes waiting out your delay. Each one takes effect when its countdown ends.")
+            Text("Each takes effect when its countdown ends.")
         }
     }
 

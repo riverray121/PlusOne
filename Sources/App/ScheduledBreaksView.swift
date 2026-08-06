@@ -19,7 +19,7 @@ struct ScheduledBreaksView: View {
                         HStack {
                             Label(rule.timeLabel, systemImage: "cup.and.saucer.fill")
                             Spacer()
-                            Text("\(rule.minutes) min · \(pluralItems(rule.itemCount))")
+                            Text("\(rule.minutes) min / \(hoursOrMinutesLabel(rule.windowMinutes))")
                                 .foregroundStyle(.secondary)
                         }
                     }
@@ -32,7 +32,7 @@ struct ScheduledBreaksView: View {
                     Label("Add break", systemImage: "plus")
                 }
             } footer: {
-                Text("A break opens its apps and websites at the set time every day for its minutes of use, no selfie needed. Outside breaks, normal blocking applies. Hard blocks and spent time limits stay blocked during breaks.")
+                Text("Opens its items daily at the set time, no selfie. Hard blocks and spent time limits stay blocked.")
             }
         }
         .navigationTitle("Scheduled breaks")
@@ -63,7 +63,11 @@ struct BreakEditView: View {
     let isNew: Bool
     let onSave: (BreakRule) -> Void
 
-    private let minuteOptions = [5, 10, 15, 20, 30, 45, 60]
+    private let windowOptions = [15, 30, 45, 60, 90, 120, 180, 240]
+
+    private var minuteOptions: [Int] {
+        [5, 10, 15, 20, 30, 45, 60, 90, 120].filter { $0 <= rule.windowMinutes }
+    }
 
     // The rule stores a minute-of-day; the picker wants a Date. Only the
     // hour and minute survive the round trip.
@@ -89,16 +93,22 @@ struct BreakEditView: View {
             // The rule is local until Save, so commit needs no extra work.
             SelectionEditor(
                 selection: $rule.selection,
-                footer: "Everything in this break opens together. Swipe an item left to remove it."
+                footer: "Swipe an item left to remove it."
             ) { _ in }
 
             Section {
                 DatePicker("Starts at", selection: startTime, displayedComponents: .hourAndMinute)
-                Picker("Minutes", selection: $rule.minutes) {
+                Picker("Window", selection: $rule.windowMinutes) {
+                    ForEach(windowOptions, id: \.self) { Text(hoursOrMinutesLabel($0)) }
+                }
+                .onChange(of: rule.windowMinutes) { window in
+                    if rule.minutes > window { rule.minutes = window }
+                }
+                Picker("Minutes of use", selection: $rule.minutes) {
                     ForEach(minuteOptions, id: \.self) { Text("\($0) min") }
                 }
             } footer: {
-                Text("The minutes are a budget of actual use, spendable from the start time until the window closes \(rule.windowMinutes) minutes later (the system requires a window of at least 15 minutes). Blocking returns when the minutes are used up or the window closes.")
+                Text("The minutes can be spent any time within the window. Blocking returns when they run out or the window ends.")
             }
         }
         .navigationTitle(isNew ? "New break" : "Edit break")

@@ -1,10 +1,10 @@
 # PlusOne scheduled breaks: Architecture
 
 ## Key decisions
-- Enforcement mirrors unlock sessions: DeviceActivity rejects intervals
-  shorter than 15 minutes, so each break arms a repeating daily schedule at
-  least that long, and a usage-threshold event at the break's minutes is the
-  real limit. The interval end is the backstop.
+- Enforcement mirrors unlock sessions: each break arms a repeating daily
+  schedule spanning its window (user-set, 15 minutes minimum because
+  DeviceActivity rejects shorter intervals), and a usage-threshold event at
+  the break's minutes is the real limit. The interval end is the backstop.
 - `BreakManager` (Shared) mirrors `TimeLimitManager`: diff-based arming
   against an `armedBreaks` snapshot, active state as an id-to-window-end
   dictionary in the App Group store, flipped by the monitor extension.
@@ -12,7 +12,7 @@
   exclusions and before hard blocks and exhausted limits union in, so a
   break can never open a hard block or a spent limit.
 - Gating: `upsertBreakRule` is a weakening unless it shrinks the same rule
-  in place (same start time, fewer or equal minutes, no added items);
+  in place (same start time, no more minutes or window, no added items);
   `deleteBreakRule` always strengthens and applies instantly. A start-time
   change is a weakening because an instant move re-arms the schedule and
   would grant a second window the same day.

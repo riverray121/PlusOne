@@ -38,6 +38,13 @@ func pluralItems(_ n: Int) -> String {
 // shared so the two warnings always offer the same marks. 0 = off.
 let warnMinuteOptions = [0, 1, 2, 5, 10]
 
+// "45 min" / "1 hour" / "2 hours"
+func hoursOrMinutesLabel(_ minutes: Int) -> String {
+    guard minutes % 60 == 0 else { return "\(minutes) min" }
+    let hours = minutes / 60
+    return hours == 1 ? "1 hour" : "\(hours) hours"
+}
+
 // "Off" / "1 hour" / "12 hours"
 func delayHoursLabel(_ minutes: Int) -> String {
     guard minutes > 0 else { return "Off" }
