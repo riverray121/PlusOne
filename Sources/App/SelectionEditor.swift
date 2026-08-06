@@ -64,35 +64,45 @@ struct SelectionEditor: View {
         }
     }
 
-    // Token arrays are captured per render so delete offsets always match the
-    // rendered order.
+    // Removal rides swipeActions rather than ForEach.onDelete: the per-row
+    // action passes the token directly (no offset mapping), and its swipe
+    // chrome animates the section's rounded corners more cleanly.
     private var appsSection: some View {
-        let tokens = Array(selection.applicationTokens)
-        return Section("Apps") {
-            ForEach(tokens, id: \.self) { Label($0) }
-                .onDelete { offsets in
-                    removeTokens(apps: offsets.map { tokens[$0] })
-                }
+        Section("Apps") {
+            ForEach(Array(selection.applicationTokens), id: \.self) { token in
+                Label(token)
+                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                        Button("Remove", role: .destructive) {
+                            removeTokens(apps: [token])
+                        }
+                    }
+            }
         }
     }
 
     private var websitesSection: some View {
-        let tokens = Array(selection.webDomainTokens)
-        return Section("Websites") {
-            ForEach(tokens, id: \.self) { Label($0) }
-                .onDelete { offsets in
-                    removeTokens(domains: offsets.map { tokens[$0] })
-                }
+        Section("Websites") {
+            ForEach(Array(selection.webDomainTokens), id: \.self) { token in
+                Label(token)
+                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                        Button("Remove", role: .destructive) {
+                            removeTokens(domains: [token])
+                        }
+                    }
+            }
         }
     }
 
     private var categoriesSection: some View {
-        let tokens = Array(selection.categoryTokens)
-        return Section("Categories") {
-            ForEach(tokens, id: \.self) { Label($0) }
-                .onDelete { offsets in
-                    removeTokens(categories: offsets.map { tokens[$0] })
-                }
+        Section("Categories") {
+            ForEach(Array(selection.categoryTokens), id: \.self) { token in
+                Label(token)
+                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                        Button("Remove", role: .destructive) {
+                            removeTokens(categories: [token])
+                        }
+                    }
+            }
         }
     }
 
