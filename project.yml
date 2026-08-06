@@ -43,10 +43,6 @@ targets:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         UILaunchScreen: {}
-        # Renders the app with the pre-iOS-26 design: the iOS 26 list swipe
-        # animation squares off rounded rows when a swipe is cancelled. Apple
-        # documents this key as temporary; drop it once that animation is fixed.
-        UIDesignRequiresCompatibility: true
         NSCameraUsageDescription: "The camera verifies two people are present before unlocking a blocked app. Frames are analyzed on-device and never stored."
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         # iPad multitasking requires all four; the capture pipeline follows the
