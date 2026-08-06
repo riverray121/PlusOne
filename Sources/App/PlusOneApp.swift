@@ -21,6 +21,7 @@ struct PlusOneApp: App {
                         ProtectionGate.shared.applyDue()
                         SessionManager.shared.endExpiredSessions()
                         TimeLimitManager.shared.clearLapsedExhausted()
+                        BreakManager.shared.clearLapsedActive()
                         SessionManager.shared.refreshShields()
                         appState.refresh()
                         Task { await FriendSync.shared.sync() }

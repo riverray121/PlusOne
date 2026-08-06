@@ -62,6 +62,14 @@ struct HomeView: View {
                 .foregroundStyle(.orange)
             }
 
+            ForEach(BreakManager.shared.activeRules) { rule in
+                Label(
+                    "Break open: \(pluralMinutes(rule.minutes)) of usage",
+                    systemImage: "cup.and.saucer.fill"
+                )
+                .foregroundStyle(.orange)
+            }
+
             if !hasAnyBlocking {
                 Text("Pick at least one app or website to protect.")
                     .font(.footnote)
@@ -127,10 +135,21 @@ struct HomeView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+
+            NavigationLink {
+                ScheduledBreaksView()
+            } label: {
+                HStack {
+                    Label("Scheduled breaks", systemImage: "cup.and.saucer.fill")
+                    Spacer()
+                    Text(breakSummary)
+                        .foregroundStyle(.secondary)
+                }
+            }
         } header: {
             Text("Blocking")
         } footer: {
-            Text("Selfie-unlock blocks open after a selfie with at least two people. Hard blocks never open. Time limits grant a budget of minutes per hour or day.")
+            Text("Selfie-unlock blocks open after a selfie with at least two people. Hard blocks never open. Time limits grant a budget of minutes per hour or day. Scheduled breaks open chosen items at set times with no selfie.")
         }
     }
 
@@ -178,6 +197,15 @@ struct HomeView: View {
         case 0: return "Off"
         case 1: return "1 limit"
         default: return "\(count) limits"
+        }
+    }
+
+    private var breakSummary: String {
+        let count = SharedStore.shared.breakRules.count
+        switch count {
+        case 0: return "Off"
+        case 1: return "1 break"
+        default: return "\(count) breaks"
         }
     }
 

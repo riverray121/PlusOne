@@ -130,6 +130,19 @@ struct ProtectionGate {
                 || existing.selection.subtracting(rule.selection).itemCount > 0
         case .deleteTimeLimitRule(let id):
             return store.timeLimitRules.contains { $0.id == id }
+        case .upsertBreakRule(let rule):
+            // Inverse of time limits: a break grants free time, so creating
+            // one, adding minutes or items, or moving the start weakens. A
+            // start-time move must queue because an instant move re-arms the
+            // schedule and would grant a second window the same day.
+            guard let existing = store.breakRules.first(where: { $0.id == rule.id }) else {
+                return true
+            }
+            return rule.minutes > existing.minutes
+                || rule.startMinuteOfDay != existing.startMinuteOfDay
+                || rule.selection.subtracting(existing.selection).itemCount > 0
+        case .deleteBreakRule:
+            return false
         case .setDelay(let minutes):
             return minutes < store.delayMinutes
         case .setDeletePrevention(let on):
@@ -150,9 +163,11 @@ struct ProtectionGate {
                 if on {
                     ShieldController.shared.applyShields()
                     TimeLimitManager.shared.syncMonitoring()
+                    BreakManager.shared.syncMonitoring()
                 } else {
                     SessionManager.shared.endAllSessions()
                     TimeLimitManager.shared.stopAll()
+                    BreakManager.shared.stopAll()
                     ShieldController.shared.clearShields()
                 }
             }
@@ -183,6 +198,18 @@ struct ProtectionGate {
         case .deleteTimeLimitRule(let id):
             store.timeLimitRules = store.timeLimitRules.filter { $0.id != id }
             resyncLimits()
+        case .upsertBreakRule(let rule):
+            var rules = store.breakRules
+            if let index = rules.firstIndex(where: { $0.id == rule.id }) {
+                rules[index] = rule
+            } else {
+                rules.append(rule)
+            }
+            store.breakRules = rules
+            resyncBreaks()
+        case .deleteBreakRule(let id):
+            store.breakRules = store.breakRules.filter { $0.id != id }
+            resyncBreaks()
         case .setDelay(let minutes):
             store.delayMinutes = minutes
         case .setDeletePrevention(let on):
@@ -198,6 +225,15 @@ struct ProtectionGate {
         guard store.protectionEnabled else { return }
         Task.detached {
             TimeLimitManager.shared.syncMonitoring()
+            SessionManager.shared.refreshShields()
+        }
+    }
+
+    // Screen Time XPC calls block; keep them off the calling thread.
+    private func resyncBreaks() {
+        guard store.protectionEnabled else { return }
+        Task.detached {
+            BreakManager.shared.syncMonitoring()
             SessionManager.shared.refreshShields()
         }
     }
@@ -222,6 +258,10 @@ struct ProtectionGate {
             return "Time limit to \(rule.minutes) min / \(rule.period.label)"
         case .deleteTimeLimitRule:
             return "Delete a time limit"
+        case .upsertBreakRule(let rule):
+            return "Scheduled break: \(pluralMinutes(rule.minutes)) at \(rule.timeLabel)"
+        case .deleteBreakRule:
+            return "Delete a scheduled break"
         case .setDelay(let minutes):
             return minutes == 0
                 ? "Turn settings change delay off"

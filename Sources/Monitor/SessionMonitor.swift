@@ -18,6 +18,18 @@ class SessionMonitor: DeviceActivityMonitor {
         if let ruleId = TimeLimitManager.ruleId(from: activity) {
             TimeLimitManager.shared.clearExhausted(ruleId)
             SessionManager.shared.refreshShields()
+            return
+        }
+        if let ruleId = BreakManager.ruleId(from: activity) {
+            BreakManager.shared.markActive(ruleId)
+            SessionManager.shared.refreshShields()
+            if let rule = BreakManager.shared.rule(withId: ruleId) {
+                Notifier.post(
+                    id: AppGroup.breakStartNotificationId,
+                    title: "Break time",
+                    body: "\(pluralItems(rule.itemCount)) unlocked for \(pluralMinutes(rule.minutes)) of use, no selfie needed."
+                )
+            }
         }
     }
 
@@ -41,6 +53,13 @@ class SessionMonitor: DeviceActivityMonitor {
             }
             return
         }
+        if let ruleId = BreakManager.ruleId(from: activity) {
+            if event == BreakManager.spentEvent {
+                BreakManager.shared.clearActive(ruleId)
+                SessionManager.shared.refreshShields()
+            }
+            return
+        }
         guard let id = sessionId(from: activity) else { return }
         switch event.rawValue {
         case AppGroup.sessionWarnEventName:
@@ -60,6 +79,11 @@ class SessionMonitor: DeviceActivityMonitor {
         super.intervalDidEnd(for: activity)
         if let ruleId = TimeLimitManager.ruleId(from: activity) {
             TimeLimitManager.shared.clearExhausted(ruleId)
+            SessionManager.shared.refreshShields()
+            return
+        }
+        if let ruleId = BreakManager.ruleId(from: activity) {
+            BreakManager.shared.clearActive(ruleId)
             SessionManager.shared.refreshShields()
             return
         }

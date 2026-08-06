@@ -22,6 +22,9 @@ struct SharedStore {
         static let exhaustedLimits = "exhaustedLimits"
         static let sessionWarnMinutes = "sessionWarnMinutes"
         static let armedLimits = "armedLimits"
+        static let breakRules = "breakRules"
+        static let activeBreaks = "activeBreaks"
+        static let armedBreaks = "armedBreaks"
         static let delayMinutes = "delayMinutes"
         static let pendingChanges = "pendingChanges"
         static let deletePrevention = "deletePrevention"
@@ -146,6 +149,25 @@ struct SharedStore {
     var armedLimits: ArmedLimits? {
         get { decoded(Key.armedLimits) }
         nonmutating set { encode(newValue, forKey: Key.armedLimits) }
+    }
+
+    // MARK: Scheduled breaks
+
+    var breakRules: [BreakRule] {
+        get { decoded(Key.breakRules) ?? [] }
+        nonmutating set { encode(newValue, forKey: Key.breakRules) }
+    }
+
+    // Breaks whose window is open, keyed by rule id, with the wall-clock
+    // window end as a backstop for a missed window-end callback.
+    var activeBreaks: [String: Date] {
+        get { decoded(Key.activeBreaks) ?? [:] }
+        nonmutating set { encode(newValue, forKey: Key.activeBreaks) }
+    }
+
+    var armedBreaks: ArmedBreaks? {
+        get { decoded(Key.armedBreaks) }
+        nonmutating set { encode(newValue, forKey: Key.armedBreaks) }
     }
 
     // MARK: Unlock flow state

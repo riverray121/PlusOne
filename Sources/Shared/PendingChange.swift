@@ -17,6 +17,8 @@ struct PendingChange: Codable, Identifiable {
         case setAdultFilter(Bool)
         case upsertTimeLimitRule(TimeLimitRule)
         case deleteTimeLimitRule(UUID)
+        case upsertBreakRule(BreakRule)
+        case deleteBreakRule(UUID)
         case setDelay(Int)
         case setDeletePrevention(Bool)
         case unpairFriend
@@ -72,6 +74,8 @@ struct PendingChange: Codable, Identifiable {
         case .setAdultFilter: return "adultFilter"
         case .upsertTimeLimitRule(let rule): return "rule-\(rule.id)"
         case .deleteTimeLimitRule(let id): return "rule-\(id)"
+        case .upsertBreakRule(let rule): return "break-\(rule.id)"
+        case .deleteBreakRule(let id): return "break-\(id)"
         case .setDelay: return "delay"
         case .setDeletePrevention: return "deletePrevention"
         case .unpairFriend: return "unpair"

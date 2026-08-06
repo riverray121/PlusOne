@@ -21,6 +21,9 @@ enum AppGroup {
 
     // Notification posted by the monitor when an unlock session is nearly over.
     static let sessionWarningNotificationId = "com.riverray.plusone.sessionWarning"
+
+    // Notification posted by the monitor when a scheduled break opens.
+    static let breakStartNotificationId = "com.riverray.plusone.breakStart"
 }
 
 func pluralMinutes(_ n: Int) -> String {
