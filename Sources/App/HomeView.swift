@@ -150,10 +150,10 @@ struct HomeView: View {
             Text("Blocking")
         } footer: {
             Text("""
-            Selfie-unlock: opens after a two-person selfie.
-            Hard blocks: never open.
-            Time limits: a budget of minutes per hour or day.
-            Breaks: free minutes at set times.
+            Selfie-unlock blocks open after a selfie with two people.
+            Hard blocks can never be opened.
+            Time limits give their apps a budget of minutes each hour or day.
+            Scheduled breaks let you use chosen apps at set times without a selfie.
             """)
         }
     }
@@ -171,7 +171,7 @@ struct HomeView: View {
                 }
             }
         } footer: {
-            Text("Each takes effect when its countdown ends.")
+            Text("Each change takes effect when its countdown ends.")
         }
     }
 

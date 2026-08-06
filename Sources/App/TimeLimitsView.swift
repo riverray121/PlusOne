@@ -32,7 +32,7 @@ struct TimeLimitsView: View {
                     Label("Add limit", systemImage: "plus")
                 }
             } footer: {
-                Text("A shared pool of minutes for its items. When it runs out they block until the hour or day rolls over. Edits restart the current period's count.")
+                Text("Each limit is a shared pool of minutes for its apps and websites. When the pool runs out, they block until the hour or day rolls over. Editing a limit restarts the current period's count.")
             }
         }
         .navigationTitle("Time limits")
@@ -93,7 +93,7 @@ struct TimeLimitEditView: View {
                     }
                 }
             } footer: {
-                Text("Budgets reset on the clock: top of the hour, or midnight. The warning fires at that many minutes left.")
+                Text("Budgets reset on the clock, at the top of each hour or at midnight. The warning notifies you when that many minutes are left.")
             }
         }
         .navigationTitle(isNew ? "New limit" : "Edit limit")
