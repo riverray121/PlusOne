@@ -32,7 +32,7 @@ struct ScheduledBreaksView: View {
                     Label("Add break", systemImage: "plus")
                 }
             } footer: {
-                Text("A break lets you use the apps and websites you add to it without a selfie. It repeats every day at the time you set. Hard blocks and used-up time limits stay blocked.")
+                Text("A break is a set period of time during which you can use apps and websites that are otherwise blocked. It repeats every day at the time you set, and it overrides every kind of block.")
             }
         }
         .navigationTitle("Scheduled breaks")

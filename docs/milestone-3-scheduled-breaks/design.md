@@ -14,8 +14,9 @@ time, and duration.
   the break. The budget counts actual use and can be spent any time within
   the window. When the budget is spent or the window closes, blocking
   returns automatically.
-- Breaks never open hard-blocked items and never refill a spent time limit.
-  Usage during a break counts against time-limit budgets as usual.
+- A break overrides every kind of block: selfie blocks, hard blocks, and
+  spent time limits all open for its items. Usage during a break still
+  counts against time-limit budgets.
 - Anti-tamper: creating a break, adding items or minutes, lengthening the
   window, or moving the start time is a weakening and goes through the
   settings change delay and friend approval. Deleting a break or shrinking

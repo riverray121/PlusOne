@@ -38,16 +38,6 @@ struct ShieldController {
             }
         }
 
-        // An open scheduled break unshields its selection the way sessions
-        // do. Hard blocks and spent limits below still win.
-        for rule in BreakManager.shared.activeRules {
-            apps.subtract(rule.selection.applicationTokens)
-            domains.subtract(rule.selection.webDomainTokens)
-            categories.subtract(rule.selection.categoryTokens)
-            exceptApps.formUnion(rule.selection.applicationTokens)
-            exceptDomains.formUnion(rule.selection.webDomainTokens)
-        }
-
         // Hard-blocked items join after session exclusions so a session can
         // never unshield them.
         apps.formUnion(hard.applicationTokens)
@@ -64,6 +54,17 @@ struct ShieldController {
             categories.formUnion(rule.selection.categoryTokens)
             exceptApps.subtract(rule.selection.applicationTokens)
             exceptDomains.subtract(rule.selection.webDomainTokens)
+        }
+
+        // An open scheduled break subtracts last: it opens its items
+        // regardless of any other block, hard blocks and spent limits
+        // included.
+        for rule in BreakManager.shared.activeRules {
+            apps.subtract(rule.selection.applicationTokens)
+            domains.subtract(rule.selection.webDomainTokens)
+            categories.subtract(rule.selection.categoryTokens)
+            exceptApps.formUnion(rule.selection.applicationTokens)
+            exceptDomains.formUnion(rule.selection.webDomainTokens)
         }
 
         store.shield.applications = apps.isEmpty ? nil : apps

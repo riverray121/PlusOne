@@ -8,9 +8,9 @@
 - `BreakManager` (Shared) mirrors `TimeLimitManager`: diff-based arming
   against an `armedBreaks` snapshot, active state as an id-to-window-end
   dictionary in the App Group store, flipped by the monitor extension.
-- Shield math: active breaks subtract from the shielded sets after session
-  exclusions and before hard blocks and exhausted limits union in, so a
-  break can never open a hard block or a spent limit.
+- Shield math: active breaks subtract from the shielded sets last, after
+  hard blocks and exhausted limits union in, so a break opens its items
+  regardless of any other block.
 - Gating: `upsertBreakRule` is a weakening unless it shrinks the same rule
   in place (same start time, no more minutes or window, no added items);
   `deleteBreakRule` always strengthens and applies instantly. A start-time
