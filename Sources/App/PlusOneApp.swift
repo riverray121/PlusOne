@@ -22,6 +22,8 @@ struct PlusOneApp: App {
                         SessionManager.shared.endExpiredSessions()
                         TimeLimitManager.shared.clearLapsedExhausted()
                         BreakManager.shared.clearLapsedActive()
+                        BreakManager.shared.openDueActive()
+                        SessionManager.shared.stopOrphanedActivities()
                         SessionManager.shared.refreshShields()
                         appState.refresh()
                         Task { await FriendSync.shared.sync() }

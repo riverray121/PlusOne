@@ -24,6 +24,7 @@ struct SharedStore {
         static let armedLimits = "armedLimits"
         static let breakRules = "breakRules"
         static let activeBreaks = "activeBreaks"
+        static let openedBreakWindows = "openedBreakWindows"
         static let armedBreaks = "armedBreaks"
         static let delayMinutes = "delayMinutes"
         static let pendingChanges = "pendingChanges"
@@ -189,6 +190,14 @@ struct SharedStore {
     var activeBreaks: [String: Date] {
         get { decoded(Key.activeBreaks) ?? [:] }
         nonmutating set { encode(newValue, forKey: Key.activeBreaks) }
+    }
+
+    // Start of the last window opened per rule id. A window is opened once, so
+    // spending its minutes closes it for the rest of the window rather than
+    // letting the foreground backstop reopen it.
+    var openedBreakWindows: [String: Date] {
+        get { decoded(Key.openedBreakWindows) ?? [:] }
+        nonmutating set { encode(newValue, forKey: Key.openedBreakWindows) }
     }
 
     var armedBreaks: ArmedBreaks? {

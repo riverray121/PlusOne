@@ -13,3 +13,4 @@ Development context for resuming work. Keep entries to one line. Not a changelog
 - Legacy PendingChange kinds (removeSelfieItems, setDuration, setCooldown, setDailyCap) are proposed by no surface but may arrive from a persisted queue; applying one affects every rule.
 - Rule lookup is first-match in stored order, so an item in two rules is governed by the older rule; a new laxer rule cannot loosen an existing block.
 - Per-rule cooldown state lives in sessionEnds and daily counts in sessionsTodayById; UnlockSession carries ruleId and warnMinutes, decoded leniently.
+- A pass frees the whole governing rule, not just the tapped item: iOS restricts an app whenever a web domain it claims is shielded, so releasing an app token while its site stays in `shield.webDomains` leaves the app blocked behind iOS's own restriction screen, which consults no shield extension; opaque tokens make app-to-site pairing impossible, so the rule is the smallest releasable unit.

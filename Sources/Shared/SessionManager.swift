@@ -40,10 +40,14 @@ struct SessionManager {
 
     func gateCheck(for target: UnlockTarget, now: Date = Date()) -> GateResult {
         let sessions = store.activeSessions.filter { $0.wallClockEnd > now }
-        if sessions.contains(where: { $0.target == target }) {
+        guard let rule = rule(containing: target) else {
+            return sessions.contains { $0.target == target } ? .sessionActive : .allowed
+        }
+        // A session frees its whole rule, so one already running covers this
+        // item and there is nothing to grant.
+        if sessions.contains(where: { $0.ruleId == rule.id || $0.target == target }) {
             return .sessionActive
         }
-        guard let rule = rule(containing: target) else { return .allowed }
         if rule.cooldownMinutes > 0, let lastEnd = store.sessionEnds[rule.id.uuidString] {
             let readyAt = lastEnd.addingTimeInterval(TimeInterval(rule.cooldownMinutes * 60))
             if readyAt > now { return .coolingDown(remaining: readyAt.timeIntervalSince(now)) }
@@ -65,13 +69,20 @@ struct SessionManager {
         let end = now.addingTimeInterval(TimeInterval(intervalMinutes * 60))
         let id = UUID().uuidString
 
-        var apps: Set<ApplicationToken> = []
-        var domains: Set<WebDomainToken> = []
-        var categories: Set<ActivityCategoryToken> = []
-        switch target {
-        case .application(let token): apps.insert(token)
-        case .webDomain(let token): domains.insert(token)
-        case .category(let token): categories.insert(token)
+        // A pass frees the whole rule that governs the tapped item, and usage
+        // is counted across that same set. An app and its website are one
+        // block to the person using it, and iOS restricts an app when a domain
+        // it claims is shielded, so releasing the app alone leaves it blocked.
+        // Pairing them automatically is impossible: the tokens are opaque.
+        var apps = rule?.selection.applicationTokens ?? []
+        var domains = rule?.selection.webDomainTokens ?? []
+        var categories = rule?.selection.categoryTokens ?? []
+        if rule == nil {
+            switch target {
+            case .application(let token): apps.insert(token)
+            case .webDomain(let token): domains.insert(token)
+            case .category(let token): categories.insert(token)
+            }
         }
 
         let schedule = DeviceActivitySchedule(
@@ -148,6 +159,30 @@ struct SessionManager {
         refreshShields(now: now)
     }
 
+    // MARK: Reconciliation
+
+    // Activity names the stored sessions should have armed.
+    var expectedActivityNames: Set<String> {
+        Set(store.activeSessions.map { activity(for: $0.id).rawValue })
+    }
+
+    // DeviceActivity monitors an activity until it is explicitly stopped, and
+    // a session's activity name lives only in its `activeSessions` record. Any
+    // path that drops the record without stopping the activity strands it:
+    // still armed, still holding a usage threshold on the item, and no longer
+    // nameable by the code that created it. Stranded activities also count
+    // against the system's monitored-activity cap. Reconciling against what
+    // the system reports is the only way to reach them.
+    func stopOrphanedActivities() {
+        let expected = expectedActivityNames
+            .union(TimeLimitManager.shared.expectedActivityNames)
+            .union(BreakManager.shared.expectedActivityNames)
+        let orphans = center.activities.filter { !expected.contains($0.rawValue) }
+        // stopMonitoring with an empty array stops every activity.
+        guard !orphans.isEmpty else { return }
+        center.stopMonitoring(orphans)
+    }
+
     // Stamps the rule's cooldown clock.
     private func markSessionEnd(_ session: UnlockSession, now: Date) {
         guard let ruleId = session.ruleId else { return }
@@ -162,7 +197,18 @@ struct SessionManager {
         guard store.protectionEnabled else { return }
         let unlocked = store.activeSessions
             .filter { $0.wallClockEnd > now }
-            .map(\.target)
+            .flatMap(unlockedTargets)
         ShieldController.shared.applyShields(excluding: unlocked)
+    }
+
+    // What a live session frees: every item in the rule that granted it,
+    // falling back to the tapped item when no rule governs it.
+    private func unlockedTargets(_ session: UnlockSession) -> [UnlockTarget] {
+        guard let ruleId = session.ruleId,
+              let rule = store.selfieRules.first(where: { $0.id == ruleId })
+        else { return [session.target] }
+        return rule.selection.applicationTokens.map(UnlockTarget.application)
+            + rule.selection.webDomainTokens.map(UnlockTarget.webDomain)
+            + rule.selection.categoryTokens.map(UnlockTarget.category)
     }
 }
