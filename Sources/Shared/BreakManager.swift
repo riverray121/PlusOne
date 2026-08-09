@@ -93,12 +93,6 @@ struct BreakManager {
         ]
     }
 
-    // Activity names the stored rules should have armed. Anything else the
-    // system is monitoring for this app is an orphan.
-    var expectedActivityNames: Set<String> {
-        Set(store.breakRules.map { activity(for: $0).rawValue })
-    }
-
     // MARK: Window state
 
     func rule(withId id: UUID) -> BreakRule? {

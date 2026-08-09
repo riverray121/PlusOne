@@ -69,20 +69,19 @@ struct SessionManager {
         let end = now.addingTimeInterval(TimeInterval(intervalMinutes * 60))
         let id = UUID().uuidString
 
-        // A pass frees the whole rule that governs the tapped item, and usage
-        // is counted across that same set. An app and its website are one
-        // block to the person using it, and iOS restricts an app when a domain
-        // it claims is shielded, so releasing the app alone leaves it blocked.
-        // Pairing them automatically is impossible: the tokens are opaque.
-        var apps = rule?.selection.applicationTokens ?? []
-        var domains = rule?.selection.webDomainTokens ?? []
-        var categories = rule?.selection.categoryTokens ?? []
-        if rule == nil {
-            switch target {
-            case .application(let token): apps.insert(token)
-            case .webDomain(let token): domains.insert(token)
-            case .category(let token): categories.insert(token)
-            }
+        // A pass frees the whole rule that governs the tapped item (see
+        // unlockedTargets), but the usage events watch only that item. Usage
+        // events spanning several tokens, armed alongside the hourly limit
+        // monitors, coincide with limit thresholds crediting usage that
+        // belongs to none of their tokens, so the counted set stays minimal;
+        // the interval end backstops items used without counting.
+        var apps: Set<ApplicationToken> = []
+        var domains: Set<WebDomainToken> = []
+        var categories: Set<ActivityCategoryToken> = []
+        switch target {
+        case .application(let token): apps.insert(token)
+        case .webDomain(let token): domains.insert(token)
+        case .category(let token): categories.insert(token)
         }
 
         let schedule = DeviceActivitySchedule(
@@ -173,11 +172,17 @@ struct SessionManager {
     // nameable by the code that created it. Stranded activities also count
     // against the system's monitored-activity cap. Reconciling against what
     // the system reports is the only way to reach them.
+    //
+    // Only session activities are swept. Time-limit and break activities keep
+    // stable rule-derived names managed by their own sync paths, and a
+    // transient failed read of those stores must never take a live monitor
+    // down mid-interval.
     func stopOrphanedActivities() {
         let expected = expectedActivityNames
-            .union(TimeLimitManager.shared.expectedActivityNames)
-            .union(BreakManager.shared.expectedActivityNames)
-        let orphans = center.activities.filter { !expected.contains($0.rawValue) }
+        let prefix = "\(AppGroup.activityName)-"
+        let orphans = center.activities.filter {
+            $0.rawValue.hasPrefix(prefix) && !expected.contains($0.rawValue)
+        }
         // stopMonitoring with an empty array stops every activity.
         guard !orphans.isEmpty else { return }
         center.stopMonitoring(orphans)

@@ -109,12 +109,6 @@ struct TimeLimitManager {
         return events
     }
 
-    // Activity names the stored rules should have armed. Anything else the
-    // system is monitoring for this app is an orphan.
-    var expectedActivityNames: Set<String> {
-        Set(store.timeLimitRules.map { activity(for: $0).rawValue })
-    }
-
     // MARK: Spent state
 
     func rule(withId id: UUID) -> TimeLimitRule? {
