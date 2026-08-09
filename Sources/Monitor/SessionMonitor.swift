@@ -15,6 +15,7 @@ class SessionMonitor: DeviceActivityMonitor {
 
     override func intervalDidStart(for activity: DeviceActivityName) {
         super.intervalDidStart(for: activity)
+        SharedStore.shared.appendMonitorLog("intervalDidStart \(activity.rawValue)")
         if let ruleId = TimeLimitManager.ruleId(from: activity) {
             TimeLimitManager.shared.clearExhausted(ruleId)
             SessionManager.shared.refreshShields()
@@ -35,6 +36,9 @@ class SessionMonitor: DeviceActivityMonitor {
 
     override func eventDidReachThreshold(_ event: DeviceActivityEvent.Name, activity: DeviceActivityName) {
         super.eventDidReachThreshold(event, activity: activity)
+        SharedStore.shared.appendMonitorLog(
+            "threshold \(event.rawValue) \(activity.rawValue)"
+        )
         if let ruleId = TimeLimitManager.ruleId(from: activity) {
             switch event {
             case TimeLimitManager.limitEvent:
@@ -78,6 +82,7 @@ class SessionMonitor: DeviceActivityMonitor {
 
     override func intervalDidEnd(for activity: DeviceActivityName) {
         super.intervalDidEnd(for: activity)
+        SharedStore.shared.appendMonitorLog("intervalDidEnd \(activity.rawValue)")
         if let ruleId = TimeLimitManager.ruleId(from: activity) {
             TimeLimitManager.shared.clearExhausted(ruleId)
             SessionManager.shared.refreshShields()

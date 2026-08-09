@@ -36,6 +36,7 @@ struct SharedStore {
         static let sessionsTodayById = "sessionsTodayById"
         static let sessionsDay = "sessionsDay"
         static let sessionEnds = "sessionEnds"
+        static let monitorLog = "monitorLog"
     }
 
     // Codable values are stored as JSON. A missing or unreadable value reads
@@ -176,6 +177,28 @@ struct SharedStore {
     var armedLimits: ArmedLimits? {
         get { decoded(Key.armedLimits) }
         nonmutating set { encode(newValue, forKey: Key.armedLimits) }
+    }
+
+    // MARK: Monitor journal
+
+    // DeviceActivity delivers its callbacks to an extension with no UI and no
+    // console, so a threshold that fires when it should not leaves no trace.
+    // Every callback appends one line here, oldest dropped past the cap.
+    private static let monitorLogCap = 300
+
+    var monitorLog: [String] {
+        get { defaults.stringArray(forKey: Key.monitorLog) ?? [] }
+        nonmutating set { defaults.set(newValue, forKey: Key.monitorLog) }
+    }
+
+    func appendMonitorLog(_ line: String, now: Date = Date()) {
+        let stamp = ISO8601DateFormatter().string(from: now)
+        var log = monitorLog
+        log.append("\(stamp) \(line)")
+        if log.count > Self.monitorLogCap {
+            log.removeFirst(log.count - Self.monitorLogCap)
+        }
+        monitorLog = log
     }
 
     // MARK: Scheduled breaks
