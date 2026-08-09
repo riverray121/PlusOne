@@ -32,6 +32,7 @@ struct FriendPairingSection: View {
                 .disabled(isPreparing)
             case .invited:
                 Label("Invitation sent", systemImage: "person.2.wave.2")
+                    .fullWidthSeparator()
                 Button("Show invitation again") { startPairing() }
                     .disabled(isPreparing)
                 Button("Withdraw invitation", role: .destructive) {
@@ -40,6 +41,7 @@ struct FriendPairingSection: View {
             case .paired:
                 Label(pairedLabel, systemImage: "person.2.fill")
                     .foregroundStyle(.green)
+                    .fullWidthSeparator()
                 Button("Invite another friend") { startPairing() }
                     .disabled(isPreparing)
                 Button(friendSync.ownerFriendNames.count > 1 ? "Unpair friends" : "Unpair friend", role: .destructive) {

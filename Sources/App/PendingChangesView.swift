@@ -139,4 +139,12 @@ extension View {
             Text(presented.message)
         }
     }
+
+    // A list row separator is inset to line up with the row's text, so a row
+    // built from a Label leaves a gap under the icon. Status rows sit among
+    // plain text rows, where that gap reads as a broken line rather than as
+    // the alignment it is meant to be.
+    func fullWidthSeparator() -> some View {
+        alignmentGuide(.listRowSeparatorLeading) { _ in 0 }
+    }
 }
