@@ -4,9 +4,10 @@ Development context for resuming work. Keep entries to one line. Not a changelog
 
 ## Completed
 - Slice 1: SelfieRule model with legacy synthesis, per-rule gates and counters, rules UI, gating, shield and extension lookups; device build green.
+- On-device: an existing selection migrated to two persisted rules, each rule's duration resolved on its own shield and session (3 min and 5 min), and a pass released its whole rule.
 
 ## Todo
-- [ ] On-device verification: migration of an existing selection, per-rule cooldown/cap, shield subtitle showing the rule's duration.
+- [ ] On-device verification: per-rule cooldown and daily cap, both 0 on the test device, so neither gate has been exercised.
 
 ## Notes
 - SharedStore.selfieRules synthesizes one rule (fixed SelfieRule.legacyId) from the legacy selection + global settings whenever the selfieRules key is absent; first write persists real rules.
