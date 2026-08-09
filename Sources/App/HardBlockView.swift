@@ -32,7 +32,7 @@ struct HardBlockView: View {
                         }
                     }
             } footer: {
-                Text("Apple's adult-content filter for Safari. Note: while on, Safari private browsing is disabled by iOS.")
+                Text("Apple's adult-content filter for Safari. Note: while it is on, iOS disables Safari private browsing and will not let you turn on Safari extensions.")
             }
         }
         .navigationTitle("Hard blocks")
