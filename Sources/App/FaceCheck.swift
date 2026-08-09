@@ -18,6 +18,10 @@ final class FaceCheck: NSObject, ObservableObject {
     // face or a photo held at a distance.
     static let minFaceExtent: CGFloat = 0.12
     static let holdDuration: TimeInterval = 1.5
+    // Longest gap in qualifying frames the hold survives. A blink, a blurred
+    // frame or a dropped buffer is shorter than this; losing a face for real
+    // is longer, and starts the hold over.
+    static let holdGrace: TimeInterval = 0.35
     // Minimum deviation (meters) of a face region from its best-fit
     // plane. A tilted screen has depth spread but is still planar; a real
     // face has a nose. Screens and photos land near sensor noise.
@@ -28,8 +32,10 @@ final class FaceCheck: NSObject, ObservableObject {
     static let minDepthBump: Float = 0.005
     // Max frame-to-frame drift (normalized) for a face to count. Fast motion
     // smears depth/video alignment into fake curvature; a smear needs speed,
-    // and speed means drift. Still-but-flat surfaces fail the metrics anyway.
-    static let maxDrift: CGFloat = 0.05
+    // and speed means drift. Still-but-flat surfaces fail the metrics anyway,
+    // so this only has to catch a swing fast enough to smear a frame, not
+    // ordinary hand shake.
+    static let maxDrift: CGFloat = 0.08
 
     @Published var validFaceCount = 0
     @Published var progress: Double = 0
@@ -48,7 +54,11 @@ final class FaceCheck: NSObject, ObservableObject {
     private var synchronizer: AVCaptureDataOutputSynchronizer?
     private let processingQueue = DispatchQueue(label: "com.riverray.plusone.facecheck")
     private var isProcessing = false
-    private var holdStart: Date?
+    // Qualifying time banked so far, and when the last qualifying frame
+    // arrived. Only time between two qualifying frames is banked, so a gap
+    // never counts toward the hold.
+    private var heldDuration: TimeInterval = 0
+    private var lastQualifyingFrame: Date?
     // processingQueue's copy of `passed`. The published property is written on
     // the main queue for the UI; frame callbacks read this one so no value
     // crosses threads unsynchronized.
@@ -145,18 +155,25 @@ final class FaceCheck: NSObject, ObservableObject {
 
     // MARK: Shared pass/hold logic
 
-    // validCount is the number of qualifying faces this frame.
+    // validCount is the number of qualifying faces this frame. The hold banks
+    // qualifying time rather than measuring elapsed time since it began, so a
+    // gap shorter than `holdGrace` pauses it and anything longer clears it.
+    // Resetting on the first imperfect frame would make a blink cost the whole
+    // hold and force both people to hold unnaturally still.
     private func updateHold(validCount: Int) {
         let qualifies = validCount >= Self.requiredFaces
         let now = Date()
         if qualifies {
-            if holdStart == nil { holdStart = now }
-        } else {
-            holdStart = nil
+            if let gap = lastQualifyingFrame.map({ now.timeIntervalSince($0) }) {
+                heldDuration = gap <= Self.holdGrace ? heldDuration + gap : 0
+            }
+            lastQualifyingFrame = now
+        } else if let last = lastQualifyingFrame, now.timeIntervalSince(last) > Self.holdGrace {
+            heldDuration = 0
+            lastQualifyingFrame = nil
         }
-        let elapsed = holdStart.map { now.timeIntervalSince($0) } ?? 0
-        let progress = min(1, elapsed / Self.holdDuration)
-        let passed = elapsed >= Self.holdDuration
+        let progress = min(1, heldDuration / Self.holdDuration)
+        let passed = heldDuration >= Self.holdDuration
         if passed { hasPassed = true }
 
         DispatchQueue.main.async {
