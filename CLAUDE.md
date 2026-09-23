@@ -31,5 +31,6 @@ Only the ACTIVE milestone is current; ignore shipped ones unless asked.
   scratch files or dead code committed.
 - Screen Time behavior (shields, DeviceActivity) can only be verified on a
   physical device; simulator results are not proof.
-- All processing is on-device. No server, no analytics, no image persistence;
-  camera frames are analyzed in memory and discarded.
+- All processing is on-device. No server, no analytics. Camera frames are
+  analyzed in memory and discarded; the only image ever persisted is the
+  passing selfie, written to the photo library when `saveSelfiesEnabled` is on.

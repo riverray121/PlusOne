@@ -45,11 +45,15 @@ struct CaptureView: View {
                 phase = .refused(gate)
                 return
             }
+            faceCheck.savesPhoto = SharedStore.shared.saveSelfiesEnabled
             faceCheck.start()
         }
         .onDisappear { faceCheck.stop() }
         .onChange(of: faceCheck.passed) { passed in
             if passed { grant() }
+        }
+        .onChange(of: faceCheck.capturedPhoto) { photo in
+            if let photo { SelfieSaver.save(photo) }
         }
     }
 
@@ -244,22 +248,7 @@ struct CameraPreview: UIViewRepresentable {
         private func applyOrientation() {
             guard let orientation = window?.windowScene?.interfaceOrientation else { return }
             onOrientationChange?(orientation)
-            guard let connection = previewLayer.connection else { return }
-            if #available(iOS 17.0, *) {
-                let angle: CGFloat
-                switch orientation {
-                case .portraitUpsideDown: angle = 270
-                case .landscapeLeft: angle = 180
-                case .landscapeRight: angle = 0
-                default: angle = 90
-                }
-                if connection.isVideoRotationAngleSupported(angle) {
-                    connection.videoRotationAngle = angle
-                }
-            } else if connection.isVideoOrientationSupported,
-                      let video = AVCaptureVideoOrientation(rawValue: orientation.rawValue) {
-                connection.videoOrientation = video
-            }
+            previewLayer.connection?.apply(interfaceOrientation: orientation)
         }
     }
 

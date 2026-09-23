@@ -27,6 +27,7 @@ Doomscroll if you must, but not alone.
    (DeviceActivity), not by the app being alive.
 
 Optional limits: a cooldown between sessions and a daily session cap.
+Optionally, each passing selfie is saved to your photo library.
 
 ## Anti-tamper
 
@@ -59,7 +60,9 @@ Four targets, mandated by the Screen Time API design:
 State is shared through an App Group. Session limits are enforced by
 `DeviceActivity` usage thresholds; a wall clock interval and a
 foreground-expiry check back that up. All processing is on-device: no server,
-no analytics, and selfie frames are analyzed in memory, never written. Friend
+no analytics, and selfie frames are analyzed in memory. The only image ever
+written is the passing selfie, saved to Photos with add-only access when the
+user opts in. Friend
 approval syncs through CloudKit (Apple-operated, iCloud accounts, no backend
 of ours); the only data that leaves the device is the approval requests and
 responses themselves.

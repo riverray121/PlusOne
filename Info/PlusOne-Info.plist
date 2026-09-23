@@ -25,7 +25,9 @@
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>NSCameraUsageDescription</key>
-	<string>The camera verifies two people are present before unlocking a blocked app. Frames are analyzed on-device and never stored.</string>
+	<string>The camera verifies two people are present before unlocking a blocked app. Frames are analyzed on-device; a passing selfie is saved only if you turn that on.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Saves your unlock selfies to your photo library when Save unlock selfies is on.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>

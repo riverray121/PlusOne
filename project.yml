@@ -47,7 +47,8 @@ targets:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         UILaunchScreen: {}
-        NSCameraUsageDescription: "The camera verifies two people are present before unlocking a blocked app. Frames are analyzed on-device and never stored."
+        NSCameraUsageDescription: "The camera verifies two people are present before unlocking a blocked app. Frames are analyzed on-device; a passing selfie is saved only if you turn that on."
+        NSPhotoLibraryAddUsageDescription: "Saves your unlock selfies to your photo library when Save unlock selfies is on."
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         # iPad multitasking requires all four; the capture pipeline follows the
         # interface orientation, so rotation is safe there.

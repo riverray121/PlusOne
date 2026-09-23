@@ -7,6 +7,7 @@ import FamilyControls
 // the whole sheet down when it closes, losing the edit.
 struct SelfieBlockView: View {
     @State private var rules = SharedStore.shared.selfieRules
+    @State private var saveSelfies = SharedStore.shared.saveSelfiesEnabled
     @State private var queued: QueuedNotice?
 
     var body: some View {
@@ -36,7 +37,20 @@ struct SelfieBlockView: View {
             }
 
             Section {
-                Label("All processing happens on this device. Selfie frames are analyzed in memory and never stored.", systemImage: "hand.raised.fill")
+                Toggle("Save unlock selfies", isOn: $saveSelfies)
+                    .onChange(of: saveSelfies) { on in
+                        SharedStore.shared.saveSelfiesEnabled = on
+                        guard on else { return }
+                        SelfieSaver.requestAccess { granted in
+                            if !granted { saveSelfies = false }
+                        }
+                    }
+            } footer: {
+                Text("Each passing selfie is saved to your photo library. PlusOne asks only for permission to add photos, never to view them; if that was denied, allow it in Settings.")
+            }
+
+            Section {
+                Label("All processing happens on this device. Selfie frames are analyzed in memory and never stored unless saving is on.", systemImage: "hand.raised.fill")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }

@@ -18,6 +18,7 @@ struct SharedStore {
         static let dailyCap = "dailyCap"
         static let adultFilter = "adultFilter"
         static let hardSelection = "hardSelection"
+        static let saveSelfies = "saveSelfies"
         static let timeLimitRules = "timeLimitRules"
         static let exhaustedLimits = "exhaustedLimits"
         static let sessionWarnMinutes = "sessionWarnMinutes"
@@ -130,6 +131,13 @@ struct SharedStore {
     var hardSelection: FamilyActivitySelection {
         get { decoded(Key.hardSelection) ?? FamilyActivitySelection() }
         nonmutating set { encode(newValue, forKey: Key.hardSelection) }
+    }
+
+    // Write each passing unlock selfie to the photo library. Off: no frame
+    // is ever persisted.
+    var saveSelfiesEnabled: Bool {
+        get { defaults.bool(forKey: Key.saveSelfies) }
+        nonmutating set { defaults.set(newValue, forKey: Key.saveSelfies) }
     }
 
     // MARK: Anti-tamper

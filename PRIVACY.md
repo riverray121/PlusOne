@@ -4,8 +4,10 @@ PlusOne does not collect or sell personal data, and it has no servers,
 accounts, analytics, or advertising.
 
 - **Camera.** The unlock selfie is analyzed on your device, in memory, using
-  Apple's Vision framework. Frames are never saved, never leave your device,
-  and are discarded immediately after the face check.
+  Apple's Vision framework. Frames never leave your device and are discarded
+  immediately after the face check. If you turn on "Save unlock selfies",
+  the passing selfie is written to your photo library; PlusOne asks only for
+  permission to add photos, never to read them.
 - **Blocked apps.** Your choice of blocked apps and websites is handled by
   Apple's Screen Time framework, which gives PlusOne only opaque tokens. The
   app cannot see which apps you selected, and this data stays on your device.

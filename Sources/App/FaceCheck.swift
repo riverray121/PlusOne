@@ -6,7 +6,8 @@ import Vision
 // enough to indicate physical presence, held for `holdDuration` of continuous
 // video. On TrueDepth hardware each face must also deviate from a flat plane,
 // which rejects faces shown on photos and screens. Frames never leave the
-// capture pipeline.
+// capture pipeline; with `savesPhoto` on, the pass also triggers one
+// full-resolution still, published as `capturedPhoto` for the owner to store.
 //
 // Depth path: faces come from AVCaptureMetadataOutput, whose rects convert
 // into video-buffer pixel space via outputRectConverted, the same space the
@@ -42,6 +43,10 @@ final class FaceCheck: NSObject, ObservableObject {
     @Published var passed = false
     @Published var cameraUnavailable = false
     @Published var depthActive = false
+    // JPEG of the still taken at the pass. Only set when `savesPhoto` was on
+    // before `start()`.
+    @Published var capturedPhoto: Data?
+    var savesPhoto = false
     #if DEBUG
     // Per-face depth metrics, for threshold tuning on device.
     @Published var debugDepthInfo = ""
@@ -51,6 +56,11 @@ final class FaceCheck: NSObject, ObservableObject {
     private let videoOutput = AVCaptureVideoDataOutput()
     private let depthOutput = AVCaptureDepthDataOutput()
     private let metadataOutput = AVCaptureMetadataOutput()
+    private let photoOutput = AVCapturePhotoOutput()
+    // A still in flight when stop() is called: stopping the session would
+    // cancel it, so the stop waits for the photo callback.
+    private var photoPending = false
+    private var stopAfterPhoto = false
     private var synchronizer: AVCaptureDataOutputSynchronizer?
     private let processingQueue = DispatchQueue(label: "com.riverray.plusone.facecheck")
     private var isProcessing = false
@@ -69,6 +79,8 @@ final class FaceCheck: NSObject, ObservableObject {
     // orientation. Owned by processingQueue; the depth path works in buffer
     // space and never reads it.
     private var exifOrientation: CGImagePropertyOrientation = .leftMirrored
+    // Interface orientation for the still's connection. Owned by processingQueue.
+    private var interfaceOrientation: UIInterfaceOrientation = .portrait
 
     // Front-camera buffers are sensor-native landscape; map the interface
     // orientation to how a captured face is rotated within them. Interface
@@ -82,7 +94,10 @@ final class FaceCheck: NSObject, ObservableObject {
         case .landscapeRight: exif = .downMirrored
         default: exif = .leftMirrored
         }
-        processingQueue.async { self.exifOrientation = exif }
+        processingQueue.async {
+            self.exifOrientation = exif
+            self.interfaceOrientation = orientation
+        }
     }
 
     func start() {
@@ -94,7 +109,11 @@ final class FaceCheck: NSObject, ObservableObject {
 
     func stop() {
         processingQueue.async { [self] in
-            if session.isRunning { session.stopRunning() }
+            if photoPending {
+                stopAfterPhoto = true
+            } else if session.isRunning {
+                session.stopRunning()
+            }
         }
     }
 
@@ -148,7 +167,18 @@ final class FaceCheck: NSObject, ObservableObject {
         } else {
             videoOutput.setSampleBufferDelegate(self, queue: processingQueue)
         }
+        let photoAdded = savesPhoto && session.canAddOutput(photoOutput)
+        if photoAdded { session.addOutput(photoOutput) }
         session.commitConfiguration()
+
+        // The still size is a property of the active format, independent of
+        // the 640x480 video preset. Read after commit, when the preset has
+        // settled the format.
+        if photoAdded,
+           let largest = device.activeFormat.supportedMaxPhotoDimensions
+            .max(by: { $0.width * $0.height < $1.width * $1.height }) {
+            photoOutput.maxPhotoDimensions = largest
+        }
 
         DispatchQueue.main.async { self.depthActive = useDepth }
     }
@@ -174,13 +204,27 @@ final class FaceCheck: NSObject, ObservableObject {
         }
         let progress = min(1, heldDuration / Self.holdDuration)
         let passed = heldDuration >= Self.holdDuration
-        if passed { hasPassed = true }
+        if passed && !hasPassed {
+            hasPassed = true
+            capturePhotoIfEnabled()
+        }
 
         DispatchQueue.main.async {
             self.validFaceCount = validCount
             self.progress = progress
             if passed && !self.passed { self.passed = true }
         }
+    }
+
+    // MARK: Still capture
+
+    private func capturePhotoIfEnabled() {
+        guard photoOutput.connection(with: .video) != nil else { return }
+        let settings = AVCapturePhotoSettings()
+        settings.maxPhotoDimensions = photoOutput.maxPhotoDimensions
+        photoOutput.connection(with: .video)?.apply(interfaceOrientation: interfaceOrientation)
+        photoPending = true
+        photoOutput.capturePhoto(with: settings, delegate: self)
     }
 
     #if DEBUG
@@ -383,6 +427,41 @@ final class FaceCheck: NSObject, ObservableObject {
         guard !center.isEmpty, !ring.isEmpty else { return (residual, 0) }
         let bump = ring.sorted()[ring.count / 2] - center.sorted()[center.count / 2]
         return (residual, bump)
+    }
+}
+
+extension FaceCheck: AVCapturePhotoCaptureDelegate {
+    func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
+        let data = error == nil ? photo.fileDataRepresentation() : nil
+        processingQueue.async { [self] in
+            photoPending = false
+            if stopAfterPhoto, session.isRunning { session.stopRunning() }
+        }
+        if let data {
+            DispatchQueue.main.async { self.capturedPhoto = data }
+        }
+    }
+}
+
+extension AVCaptureConnection {
+    // Rotates the connection's output to match the interface orientation.
+    // Front-camera buffers are sensor-native landscape, so portrait is 90.
+    func apply(interfaceOrientation: UIInterfaceOrientation) {
+        if #available(iOS 17.0, *) {
+            let angle: CGFloat
+            switch interfaceOrientation {
+            case .portraitUpsideDown: angle = 270
+            case .landscapeLeft: angle = 180
+            case .landscapeRight: angle = 0
+            default: angle = 90
+            }
+            if isVideoRotationAngleSupported(angle) {
+                videoRotationAngle = angle
+            }
+        } else if isVideoOrientationSupported,
+                  let video = AVCaptureVideoOrientation(rawValue: interfaceOrientation.rawValue) {
+            videoOrientation = video
+        }
     }
 }
 
