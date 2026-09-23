@@ -8,7 +8,7 @@ class ShieldActionProvider: ShieldActionDelegate {
     private func requestUnlock(_ target: UnlockTarget, completionHandler: @escaping (ShieldActionResponse) -> Void) {
         SharedStore.shared.pendingUnlock = target
         Notifier.post(
-            id: AppGroup.unlockNotificationId,
+            kind: AppGroup.unlockNotificationId,
             title: "Unlock with a selfie",
             body: "Tap to take a selfie with someone and unlock this \(target.displayNoun)."
         ) {

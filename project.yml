@@ -29,6 +29,10 @@ targets:
       path: Entitlements/PlusOne.entitlements
       properties:
         com.apple.developer.family-controls: true
+        # Extensions post the notifications, but iOS attributes them to the
+        # containing app, whose entitlement decides whether .timeSensitive
+        # is honored. The extension App IDs cannot carry this capability.
+        com.apple.developer.usernotifications.time-sensitive: true
         com.apple.security.application-groups:
           - group.com.riverray.plusone
         com.apple.developer.icloud-container-identifiers:

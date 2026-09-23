@@ -13,7 +13,8 @@ enum AppGroup {
     static let usageEventName = "usageLimit"
     static let sessionWarnEventName = "sessionWarn"
 
-    // Notification posted by the shield action to route the user into the app.
+    // Notification kinds (see Notifier). Posted by the shield action to route
+    // the user into the app.
     static let unlockNotificationId = "com.riverray.plusone.unlock"
 
     // Notification posted by the monitor when a time limit is nearly spent.

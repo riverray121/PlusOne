@@ -114,7 +114,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         didReceive response: UNNotificationResponse,
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
-        if response.notification.request.identifier == AppGroup.unlockNotificationId {
+        if Notifier.matches(response.notification.request.identifier, kind: AppGroup.unlockNotificationId) {
             NotificationCenter.default.post(name: .plusOneOpenCapture, object: nil)
         }
         completionHandler()

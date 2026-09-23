@@ -26,7 +26,7 @@ class SessionMonitor: DeviceActivityMonitor {
             SessionManager.shared.refreshShields()
             if let rule = BreakManager.shared.rule(withId: ruleId) {
                 Notifier.post(
-                    id: AppGroup.breakStartNotificationId,
+                    kind: AppGroup.breakStartNotificationId,
                     title: "Break time",
                     body: "\(pluralItems(rule.itemCount)) unlocked for \(pluralMinutes(rule.minutes)) of use, no selfie needed."
                 )
@@ -47,7 +47,7 @@ class SessionMonitor: DeviceActivityMonitor {
             case TimeLimitManager.warnEvent:
                 if let rule = TimeLimitManager.shared.rule(withId: ruleId) {
                     Notifier.post(
-                        id: AppGroup.limitWarningNotificationId,
+                        kind: AppGroup.limitWarningNotificationId,
                         title: "Time limit almost up",
                         body: "You have \(pluralMinutes(rule.warnMinutes)) left of \(pluralMinutes(rule.minutes)) per \(rule.period.label)."
                     )
@@ -69,7 +69,7 @@ class SessionMonitor: DeviceActivityMonitor {
         case AppGroup.sessionWarnEventName:
             let warn = SharedStore.shared.activeSessions.first { $0.id == id }?.warnMinutes ?? 1
             Notifier.post(
-                id: AppGroup.sessionWarningNotificationId,
+                kind: AppGroup.sessionWarningNotificationId,
                 title: "Session ending soon",
                 body: "You have \(pluralMinutes(warn)) left on this unlock."
             )

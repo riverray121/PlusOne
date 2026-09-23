@@ -5,9 +5,11 @@ Development context for resuming work. Keep entries to one line. Not a changelog
 ## Completed
 - Slice 1: SelfieRule model with legacy synthesis, per-rule gates and counters, rules UI, gating, shield and extension lookups; device build green.
 - On-device: an existing selection migrated to two persisted rules, each rule's duration resolved on its own shield and session (3 min and 5 min), and a pass released its whole rule.
+- Notifications: every post gets a unique identifier under its kind and clears older delivered ones, since an in-place update of an unread notification shows no banner; Time Sensitive entitlement on all targets so Focus and the scheduled summary do not silence unlock prompts.
 
 ## Todo
 - [ ] On-device verification: per-rule cooldown and daily cap, both 0 on the test device, so neither gate has been exercised.
+- [ ] On-device verification: unlock banner appears with a Focus mode on and with an earlier unread unlock notification present.
 
 ## Notes
 - SharedStore.selfieRules synthesizes one rule (fixed SelfieRule.legacyId) from the legacy selection + global settings whenever the selfieRules key is absent; first write persists real rules.
