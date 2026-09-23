@@ -17,6 +17,7 @@ struct HomeView: View {
                 }
                 blockedListSection
                 antiTamperSection
+                diagnosticsSection
             }
             .navigationTitle("PlusOne")
             // Summary counts read SharedStore directly; re-render on return
@@ -184,6 +185,18 @@ struct HomeView: View {
             }
         } footer: {
             Text("Makes loosening your protection slow and deliberate.")
+        }
+    }
+
+    private var diagnosticsSection: some View {
+        Section {
+            NavigationLink {
+                MonitorLogView()
+            } label: {
+                Label("Monitor journal", systemImage: "list.bullet.rectangle")
+            }
+        } footer: {
+            Text("Every Screen Time callback PlusOne received, for checking why a limit or session ended.")
         }
     }
 
