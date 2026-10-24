@@ -1,75 +1,67 @@
 # PlusOne
 
-An iOS commitment device: the apps and websites you choose are blocked unless
-you take a selfie with at least two people in it. Pass the check and you get a
-timed session (default 5 minutes). When it ends, the block returns on its own.
+An iOS app that blocks the apps and websites you choose. To open one, take a
+selfie with at least one other person in it. Pass the check and you get a
+timed session; when it ends, the block comes back on its own.
 
 Doomscroll if you must, but not alone.
 
 <p>
-  <img src="docs/media/onboarding.png" width="280" alt="Onboarding screen" />
-  <img src="docs/media/home.png" width="280" alt="Home screen" />
+  <img src="docs/media/onboarding.png" width="240" alt="Onboarding: permissions and choosing what to block" />
+  <img src="docs/media/home.png" width="240" alt="Home: protection toggle and the four kinds of blocking" />
+  <img src="docs/media/block-editor.png" width="240" alt="Selfie-unlock block editor: duration, cooldown, daily cap, warning" />
+  <img src="docs/media/anti-tamper.png" width="240" alt="Anti-tamper: delete prevention, settings change delay, friend approval" />
 </p>
 
-## How it works
+## How unlocking works
 
-1. Pick any apps and websites to protect. iOS shields them: opening one shows
-   a block screen instead of the app.
-2. The block screen has one button: "Unlock with a selfie." It routes into
-   PlusOne through a notification tap (shield extensions cannot launch apps
-   directly).
-3. PlusOne runs a live check on the front camera: at least two faces, each
-   large enough to be physically present, held for ~1.5 seconds of continuous
-   video. A single face never passes; neither does waving a photo past the
-   lens.
-4. A pass unshields only the item you were trying to open, for the configured
-   number of usage minutes. Re-locking is enforced by the system
-   (DeviceActivity), not by the app being alive.
+1. Opening a blocked app shows a block screen with one button: **Unlock with a
+   selfie**. It opens PlusOne through a notification.
+2. PlusOne checks the front camera live. It passes when two faces, each close
+   enough to be physically present, stay in frame for 1.5 seconds of
+   continuous video. A blink or a dropped frame does not reset the hold.
+3. On iPhones with a TrueDepth camera, each face must also have real 3D depth
+   (a nose closer than the cheeks), which rejects photos and screens.
+4. A pass unlocks the item you tapped for its session length. iOS Screen Time
+   re-locks it when the time is used, whether or not PlusOne is running.
 
-Optional limits: a cooldown between sessions and a daily session cap.
 Optionally, each passing selfie is saved to your photo library.
+
+## Ways to block
+
+| Type              | Behavior                                                                                                   |
+| ----------------- | ---------------------------------------------------------------------------------------------------------- |
+| Selfie-unlock     | Blocked until a selfie passes. Each block sets its own unlock length, cooldown, daily cap, and warning.    |
+| Hard block        | Always blocked, no unlock. Includes Apple's adult-content filter for Safari.                                |
+| Time limit        | A shared pool of minutes per hour or per day. When it runs out, the items block until the period resets.   |
+| Scheduled break   | A daily window with a minute budget during which every block is lifted.                                    |
 
 ## Anti-tamper
 
-Quitting on impulse is the failure mode, so weakening the setup is slow and
-visible:
+Weakening your setup is slow and visible on purpose:
 
-- **Settings change delay**: any change that weakens protection (removing a
-  blocked item, lengthening the unlock duration, turning protection off)
-  waits a configurable 1 to 72 hours, with a visible countdown and one-tap
-  cancel. Strengthening is always immediate.
-- **Delete prevention**: an optional toggle holds the OS app-removal
-  restriction, so no app on the device can be deleted while it is on
-  (device-wide by iOS design). Turning it off goes through the delay.
-- **Friend approval**: pair with one friend through iCloud. Weakening changes
-  are sent to their copy of PlusOne in plain language; approval applies the
-  change immediately, denial discards it, and silence falls back to the delay
-  countdown. Unpairing itself needs approval or the delay.
+- **Settings change delay**: any change that loosens protection waits 1 to 72
+  hours, with a countdown and a cancel button. Tightening applies at once.
+- **Prevent app deletion**: while on, no app on the phone can be deleted,
+  PlusOne included.
+- **Friend approval**: pair with friends through iCloud. A pending change can
+  be sent to them; approval applies it now, denial discards it, and no answer
+  leaves it to the delay.
 
-## Architecture
+## Privacy
 
-Four targets, mandated by the Screen Time API design:
+Everything runs on the device. No server, no accounts, no analytics. Camera
+frames are analyzed in memory and discarded. Friend approval uses CloudKit,
+and only the approval requests and answers leave the phone.
 
-| Target | Role |
-|--------|------|
-| `PlusOne` | SwiftUI app: onboarding, blocked list, selfie check, settings |
-| `ShieldUIExtension` | Draws the custom block screen |
-| `ShieldActionExtension` | Handles the unlock button; records the request, posts the notification |
-| `MonitorExtension` | Ends sessions via usage threshold and interval-end backstop |
+## Built with
 
-State is shared through an App Group. Session limits are enforced by
-`DeviceActivity` usage thresholds; a wall clock interval and a
-foreground-expiry check back that up. All processing is on-device: no server,
-no analytics, and selfie frames are analyzed in memory. The only image ever
-written is the passing selfie, saved to Photos with add-only access when the
-user opts in. Friend
-approval syncs through CloudKit (Apple-operated, iCloud accounts, no backend
-of ours); the only data that leaves the device is the approval requests and
-responses themselves.
+SwiftUI, Screen Time APIs (FamilyControls, ManagedSettings, DeviceActivity),
+AVFoundation and Vision for the face check, CloudKit for friend approval.
 
-## Building
+## Build
 
-Requires Xcode 15+ and [XcodeGen](https://github.com/yonaskolb/XcodeGen):
+Requires Xcode and [XcodeGen](https://github.com/yonaskolb/XcodeGen).
 
 ```sh
 brew install xcodegen
@@ -77,17 +69,13 @@ xcodegen generate
 open PlusOne.xcodeproj
 ```
 
-Screen Time features require a physical device and the Family Controls
-capability (free for development-signed builds; App Store distribution
-requires Apple's entitlement approval). The simulator runs the UI but cannot
-shield apps or use the camera.
+Blocking and the camera need a physical iPhone and the Family Controls
+capability. The simulator runs the UI only.
 
-## Honest limitations
+## Limitations
 
-- iOS does not let a self-managed app fully protect itself: revoking
-  PlusOne's Screen Time permission in Settings clears every restriction,
-  delete prevention included. A friend-held Screen Time passcode closes that
-  gap; without one, PlusOne is friction, not a jail.
-- The two-face check is a behavioral nudge, not biometric security. A
-  sufficiently motivated person can defeat it. That person could also just
-  delete the app.
+- Revoking PlusOne's Screen Time permission in iOS Settings removes every
+  block, including delete prevention. A Screen Time passcode held by a friend
+  closes that gap.
+- The face check is a nudge, not biometric security. A determined person can
+  get past it.
