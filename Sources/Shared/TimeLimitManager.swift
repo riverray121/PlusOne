@@ -33,11 +33,15 @@ struct TimeLimitManager {
     // Rearms monitoring to match the stored rules. Diffs against the last
     // armed state and restarts only rules whose definition changed: usage
     // thresholds count from when monitoring starts, so a restart wipes the
-    // minutes already counted this period.
+    // minutes already counted this period. A rule the system is not actually
+    // monitoring is armed even when its definition matches: the armed
+    // snapshot lives in the App Group and survives a backup restore onto a
+    // new device, while DeviceActivity schedules do not.
     func syncMonitoring() {
         let rules = store.timeLimitRules
         let armed = store.armedLimits?.rules ?? []
         let armedById = Dictionary(uniqueKeysWithValues: armed.map { ($0.id, $0) })
+        let monitored = Set(center.activities)
 
         let currentIds = Set(rules.map(\.id))
         let removed = armed.filter { !currentIds.contains($0.id) }
@@ -47,9 +51,10 @@ struct TimeLimitManager {
         }
 
         for rule in rules {
-            if armedById[rule.id] == rule { continue }
+            let unchanged = armedById[rule.id] == rule
+            if unchanged, monitored.contains(activity(for: rule)) { continue }
             center.stopMonitoring([activity(for: rule)])
-            clearExhausted(rule.id)
+            if !unchanged { clearExhausted(rule.id) }
             try? center.startMonitoring(
                 activity(for: rule),
                 during: schedule(for: rule.period),

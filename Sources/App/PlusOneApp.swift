@@ -19,6 +19,10 @@ struct PlusOneApp: App {
                     // an unlock request written by the shield action extension.
                     if phase == .active {
                         ProtectionGate.shared.applyDue()
+                        if SharedStore.shared.protectionEnabled {
+                            TimeLimitManager.shared.syncMonitoring()
+                            BreakManager.shared.syncMonitoring()
+                        }
                         SessionManager.shared.endExpiredSessions()
                         TimeLimitManager.shared.clearLapsedExhausted()
                         BreakManager.shared.clearLapsedActive()

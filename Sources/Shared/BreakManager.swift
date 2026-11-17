@@ -31,11 +31,15 @@ struct BreakManager {
 
     // Rearms monitoring to match the stored rules. Diffs against the last
     // armed state and restarts only rules whose definition changed: a restart
-    // mid-window drops the window until the schedule next fires.
+    // mid-window drops the window until the schedule next fires. A rule the
+    // system is not actually monitoring is armed even when its definition
+    // matches: the armed snapshot lives in the App Group and survives a
+    // backup restore onto a new device, while DeviceActivity schedules do not.
     func syncMonitoring(now: Date = Date()) {
         let rules = store.breakRules
         let armed = store.armedBreaks?.rules ?? []
         let armedById = Dictionary(uniqueKeysWithValues: armed.map { ($0.id, $0) })
+        let monitored = Set(center.activities)
 
         let currentIds = Set(rules.map(\.id))
         let removed = armed.filter { !currentIds.contains($0.id) }
@@ -48,10 +52,15 @@ struct BreakManager {
         }
 
         for rule in rules {
-            if armedById[rule.id] == rule { continue }
+            let unchanged = armedById[rule.id] == rule
+            if unchanged, monitored.contains(activity(for: rule)) { continue }
             center.stopMonitoring([activity(for: rule)])
-            clearActive(rule.id)
-            suppressCurrentWindow(rule, now: now)
+            // A missing schedule never opened its current window, so the
+            // foreground backstop is left free to open it.
+            if !unchanged {
+                clearActive(rule.id)
+                suppressCurrentWindow(rule, now: now)
+            }
             try? center.startMonitoring(
                 activity(for: rule),
                 during: schedule(for: rule),
