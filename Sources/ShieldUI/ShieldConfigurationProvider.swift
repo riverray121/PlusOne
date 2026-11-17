@@ -6,17 +6,24 @@ import UIKit
 // items and spent time limits get variants with no unlock path.
 class ShieldConfigurationProvider: ShieldConfigurationDataSource {
 
+    // The shield draws template symbols in black; the background is dark.
+    private static func icon(_ name: String) -> UIImage? {
+        UIImage(systemName: name)?.withTintColor(.white, renderingMode: .alwaysOriginal)
+    }
+
     private func unlockable(minutes: Int) -> ShieldConfiguration {
         ShieldConfiguration(
             backgroundBlurStyle: .systemUltraThinMaterialDark,
             backgroundColor: UIColor.black.withAlphaComponent(0.4),
-            icon: UIImage(systemName: "person.2.fill"),
+            icon: Self.icon("person.2.fill"),
             title: .init(text: "Blocked by PlusOne", color: .white),
             subtitle: .init(
                 text: "Take a selfie with someone to unlock \(pluralMinutes(minutes)).",
                 color: UIColor.white.withAlphaComponent(0.8)
             ),
-            primaryButtonLabel: .init(text: "Unlock with a selfie", color: .black),
+            // iOS 27 sizes the button to its label and wraps longer text
+            // onto left-aligned lines, so the label stays one short word.
+            primaryButtonLabel: .init(text: "Unlock", color: .black),
             primaryButtonBackgroundColor: .white,
             secondaryButtonLabel: nil
         )
@@ -26,7 +33,7 @@ class ShieldConfigurationProvider: ShieldConfigurationDataSource {
         ShieldConfiguration(
             backgroundBlurStyle: .systemUltraThinMaterialDark,
             backgroundColor: UIColor.black.withAlphaComponent(0.5),
-            icon: UIImage(systemName: icon),
+            icon: Self.icon(icon),
             title: .init(text: title, color: .white),
             subtitle: .init(text: subtitle, color: UIColor.white.withAlphaComponent(0.8)),
             primaryButtonLabel: .init(text: "Close", color: .white),
