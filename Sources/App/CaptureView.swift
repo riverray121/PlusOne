@@ -62,9 +62,7 @@ struct CaptureView: View {
     private var cameraView: some View {
         VStack(spacing: 16) {
             ZStack {
-                CameraPreview(session: faceCheck.session) { orientation in
-                    faceCheck.updateInterfaceOrientation(orientation)
-                }
+                CameraPreview(faceCheck: faceCheck)
                 .clipShape(RoundedRectangle(cornerRadius: 20))
                 if faceCheck.cameraUnavailable {
                     VStack(spacing: 8) {
@@ -216,16 +214,15 @@ struct CaptureView: View {
 }
 
 // Thin wrapper exposing the capture session's preview layer to SwiftUI.
-// Keeps the preview upright as the scene rotates (iPad supports all
-// orientations) and reports the orientation so frame analysis can match.
+// FaceCheck owns the preview rotation; this view hands it the layer and, for
+// the iOS 16 fallback, the interface orientation as the scene rotates.
 struct CameraPreview: UIViewRepresentable {
-    let session: AVCaptureSession
-    var onOrientationChange: ((UIInterfaceOrientation) -> Void)?
+    let faceCheck: FaceCheck
 
     final class PreviewView: UIView {
         override class var layerClass: AnyClass { AVCaptureVideoPreviewLayer.self }
         var previewLayer: AVCaptureVideoPreviewLayer { layer as! AVCaptureVideoPreviewLayer }
-        var onOrientationChange: ((UIInterfaceOrientation) -> Void)?
+        weak var faceCheck: FaceCheck?
         private var startObserver: NSObjectProtocol?
 
         // The preview connection only exists once the session is configured,
@@ -246,22 +243,23 @@ struct CameraPreview: UIViewRepresentable {
         }
 
         private func applyOrientation() {
-            guard let orientation = window?.windowScene?.interfaceOrientation else { return }
-            onOrientationChange?(orientation)
-            previewLayer.connection?.apply(interfaceOrientation: orientation)
+            guard let faceCheck else { return }
+            if let orientation = window?.windowScene?.interfaceOrientation {
+                faceCheck.updateInterfaceOrientation(orientation)
+            }
+            faceCheck.reapplyPreviewAngle()
         }
     }
 
     func makeUIView(context: Context) -> PreviewView {
         let view = PreviewView()
-        view.previewLayer.session = session
+        view.previewLayer.session = faceCheck.session
         view.previewLayer.videoGravity = .resizeAspectFill
-        view.onOrientationChange = onOrientationChange
-        view.observeSessionStart(session)
+        view.faceCheck = faceCheck
+        view.observeSessionStart(faceCheck.session)
+        faceCheck.attachPreview(view.previewLayer)
         return view
     }
 
-    func updateUIView(_ uiView: PreviewView, context: Context) {
-        uiView.onOrientationChange = onOrientationChange
-    }
+    func updateUIView(_ uiView: PreviewView, context: Context) {}
 }

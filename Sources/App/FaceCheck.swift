@@ -9,9 +9,14 @@ import Vision
 // capture pipeline; with `savesPhoto` on, the pass also triggers one
 // full-resolution still, published as `capturedPhoto` for the owner to store.
 //
+// Rotation: video and depth buffers are pinned to the sensor's native
+// orientation, which differs between camera modules and is not assumed. On
+// iOS 17+ a RotationCoordinator supplies the preview and capture angles for
+// the actual device.
+//
 // Depth path: faces come from AVCaptureMetadataOutput, whose rects convert
 // into video-buffer pixel space via outputRectConverted, the same space the
-// depth map is aligned to. No hand-rolled orientation math.
+// depth map is aligned to because both connections share one rotation.
 // 2D path (no TrueDepth: Macs, older devices): Vision detection only.
 final class FaceCheck: NSObject, ObservableObject {
     static let requiredFaces = 2
@@ -75,29 +80,81 @@ final class FaceCheck: NSObject, ObservableObject {
     private var hasPassed = false
     // Face centers from the previous depth-path frame, for the drift gate.
     private var previousCenters: [CGPoint] = []
-    // EXIF orientation for the 2D path, matching the current interface
-    // orientation. Owned by processingQueue; the depth path works in buffer
-    // space and never reads it.
-    private var exifOrientation: CGImagePropertyOrientation = .leftMirrored
-    // Interface orientation for the still's connection. Owned by processingQueue.
-    private var interfaceOrientation: UIInterfaceOrientation = .portrait
+    // Clockwise rotation (degrees) that makes a native buffer upright, used
+    // for the 2D path's Vision orientation and the still's connection. Owned
+    // by processingQueue; the depth path works in buffer space and never
+    // reads it.
+    private var captureAngle: CGFloat = 90
+    // iOS 16 Vision orientation per interface orientation, used while no
+    // rotation coordinator runs. Owned by processingQueue.
+    private var legacyExif: CGImagePropertyOrientation?
 
-    // Front-camera buffers are sensor-native landscape; map the interface
-    // orientation to how a captured face is rotated within them. Interface
-    // landscape names are the reverse of device landscape names, which is why
-    // interface landscapeLeft pairs with upMirrored.
+    // Main-queue state for the iOS 17+ rotation coordinator, which needs both
+    // the configured device and the preview layer.
+    private var device: AVCaptureDevice?
+    private weak var previewLayer: AVCaptureVideoPreviewLayer?
+    private var rotationCoordinator: AnyObject?
+    private var rotationObservations: [NSKeyValueObservation] = []
+
+    // Called on the main queue once the preview view exists.
+    func attachPreview(_ layer: AVCaptureVideoPreviewLayer) {
+        previewLayer = layer
+        startRotationCoordinatorIfReady()
+    }
+
+    // iOS 16 fallback: derive the angles from the interface orientation,
+    // assuming a landscape-native front sensor. Called on the main queue.
     func updateInterfaceOrientation(_ orientation: UIInterfaceOrientation) {
+        guard rotationCoordinator == nil else { return }
+        // Interface landscape names are the reverse of device landscape
+        // names, which is why interface landscapeLeft pairs with upMirrored.
+        let angle: CGFloat
         let exif: CGImagePropertyOrientation
         switch orientation {
-        case .portraitUpsideDown: exif = .rightMirrored
-        case .landscapeLeft: exif = .upMirrored
-        case .landscapeRight: exif = .downMirrored
-        default: exif = .leftMirrored
+        case .portraitUpsideDown: angle = 270; exif = .rightMirrored
+        case .landscapeLeft: angle = 180; exif = .upMirrored
+        case .landscapeRight: angle = 0; exif = .downMirrored
+        default: angle = 90; exif = .leftMirrored
         }
+        applyPreviewAngle(angle)
         processingQueue.async {
-            self.exifOrientation = exif
-            self.interfaceOrientation = orientation
+            self.captureAngle = angle
+            self.legacyExif = exif
         }
+    }
+
+    // Reapplies the current preview angle; the preview connection only
+    // exists once the session is configured.
+    func reapplyPreviewAngle() {
+        if #available(iOS 17.0, *),
+           let coordinator = rotationCoordinator as? AVCaptureDevice.RotationCoordinator {
+            applyPreviewAngle(coordinator.videoRotationAngleForHorizonLevelPreview)
+        }
+    }
+
+    private func applyPreviewAngle(_ angle: CGFloat) {
+        previewLayer?.connection?.apply(rotationAngle: angle)
+    }
+
+    private func startRotationCoordinatorIfReady() {
+        guard #available(iOS 17.0, *),
+              rotationCoordinator == nil,
+              let device, let previewLayer
+        else { return }
+        let coordinator = AVCaptureDevice.RotationCoordinator(device: device, previewLayer: previewLayer)
+        rotationCoordinator = coordinator
+        rotationObservations = [
+            coordinator.observe(\.videoRotationAngleForHorizonLevelPreview, options: [.initial, .new]) { [weak self] coordinator, _ in
+                self?.applyPreviewAngle(coordinator.videoRotationAngleForHorizonLevelPreview)
+            },
+            coordinator.observe(\.videoRotationAngleForHorizonLevelCapture, options: [.initial, .new]) { [weak self] coordinator, _ in
+                let angle = coordinator.videoRotationAngleForHorizonLevelCapture
+                self?.processingQueue.async {
+                    self?.captureAngle = angle
+                    self?.legacyExif = nil
+                }
+            },
+        ]
     }
 
     func start() {
@@ -160,6 +217,15 @@ final class FaceCheck: NSObject, ObservableObject {
             }
         }
 
+        // Data outputs physically rotate their buffers, and the default angle
+        // varies by camera module. Pinning both to 0 keeps the depth map
+        // aligned with the video buffer and makes captureAngle the full
+        // rotation to upright.
+        if #available(iOS 17.0, *) {
+            videoOutput.connection(with: .video)?.apply(rotationAngle: 0)
+            if useDepth { depthOutput.connection(with: .depthData)?.apply(rotationAngle: 0) }
+        }
+
         if useDepth {
             let sync = AVCaptureDataOutputSynchronizer(dataOutputs: [videoOutput, depthOutput, metadataOutput])
             sync.setDelegate(self, queue: processingQueue)
@@ -180,7 +246,11 @@ final class FaceCheck: NSObject, ObservableObject {
             photoOutput.maxPhotoDimensions = largest
         }
 
-        DispatchQueue.main.async { self.depthActive = useDepth }
+        DispatchQueue.main.async {
+            self.depthActive = useDepth
+            self.device = device
+            self.startRotationCoordinatorIfReady()
+        }
     }
 
     // MARK: Shared pass/hold logic
@@ -222,7 +292,7 @@ final class FaceCheck: NSObject, ObservableObject {
         guard photoOutput.connection(with: .video) != nil else { return }
         let settings = AVCapturePhotoSettings()
         settings.maxPhotoDimensions = photoOutput.maxPhotoDimensions
-        photoOutput.connection(with: .video)?.apply(interfaceOrientation: interfaceOrientation)
+        photoOutput.connection(with: .video)?.apply(rotationAngle: captureAngle)
         photoPending = true
         photoOutput.capturePhoto(with: settings, delegate: self)
     }
@@ -254,20 +324,16 @@ final class FaceCheck: NSObject, ObservableObject {
         #if DEBUG
         var debugFaces: [String] = []
         #endif
-        for face in faces {
-            // Metadata rect -> video-buffer pixel rect (Apple-provided
-            // conversion), then normalized top-left-origin coordinates shared
-            // by the aligned depth map.
-            let pixelRect = videoOutput.outputRectConverted(fromMetadataOutputRect: face.bounds)
-            let norm = CGRect(
-                x: pixelRect.minX / videoW,
-                y: pixelRect.minY / videoH,
-                width: pixelRect.width / videoW,
-                height: pixelRect.height / videoH
-            )
+        for norm in Self.faceRects(faces: faces, videoBuffer: videoBuffer, videoOutput: videoOutput) {
             // The buffer is landscape while the phone is portrait, so face
             // height can land on either axis; use the larger extent.
-            guard max(norm.width, norm.height) >= Self.minFaceExtent else { continue }
+            let extent = max(norm.width, norm.height)
+            guard extent >= Self.minFaceExtent else {
+                #if DEBUG
+                debugFaces.append(String(format: "SMALL ext %.2f", extent))
+                #endif
+                continue
+            }
 
             let metrics = Self.depthMetrics(in: norm, depth: depth)
             let solid = metrics.residual >= Self.minDepthResidual && metrics.bump >= Self.minDepthBump
@@ -282,9 +348,9 @@ final class FaceCheck: NSObject, ObservableObject {
 
             if solid && still { validCount += 1 }
             #if DEBUG
-            debugFaces.append(String(format: "%@ res %.1fmm bump %.1fmm",
+            debugFaces.append(String(format: "%@ ext %.2f res %.1fmm bump %.1fmm",
                                      !still ? "MOVE" : solid ? "PASS" : "FAIL",
-                                     metrics.residual * 1000, metrics.bump * 1000))
+                                     extent, metrics.residual * 1000, metrics.bump * 1000))
             #endif
         }
         previousCenters = centers
@@ -292,6 +358,36 @@ final class FaceCheck: NSObject, ObservableObject {
         #if DEBUG
         updateDebug(debugFaces)
         #endif
+    }
+
+
+    // Face rects in normalized top-left-origin video-buffer coordinates,
+    // shared by the aligned depth map. Landscape buffers use the metadata
+    // faces through Apple's rect conversion. Portrait buffers (front cameras
+    // whose sensor is not landscape-native) get faces from Vision on the
+    // buffer itself, because outputRectConverted maps metadata rects as if
+    // the buffer were landscape and lands them transposed.
+    private static func faceRects(faces: [AVMetadataFaceObject], videoBuffer: CVPixelBuffer, videoOutput: AVCaptureVideoDataOutput) -> [CGRect] {
+        let videoW = CGFloat(CVPixelBufferGetWidth(videoBuffer))
+        let videoH = CGFloat(CVPixelBufferGetHeight(videoBuffer))
+        guard videoW < videoH else {
+            return faces.map { face in
+                let pixelRect = videoOutput.outputRectConverted(fromMetadataOutputRect: face.bounds)
+                return CGRect(
+                    x: pixelRect.minX / videoW,
+                    y: pixelRect.minY / videoH,
+                    width: pixelRect.width / videoW,
+                    height: pixelRect.height / videoH
+                )
+            }
+        }
+        let request = VNDetectFaceRectanglesRequest()
+        try? VNImageRequestHandler(cvPixelBuffer: videoBuffer, orientation: .up).perform([request])
+        // Vision's origin is bottom-left; buffer rows run top-down.
+        return (request.results ?? []).map { face in
+            let box = face.boundingBox
+            return CGRect(x: box.minX, y: 1 - box.maxY, width: box.width, height: box.height)
+        }
     }
 
     // MARK: 2D path evaluation
@@ -444,23 +540,34 @@ extension FaceCheck: AVCapturePhotoCaptureDelegate {
 }
 
 extension AVCaptureConnection {
-    // Rotates the connection's output to match the interface orientation.
-    // Front-camera buffers are sensor-native landscape, so portrait is 90.
-    func apply(interfaceOrientation: UIInterfaceOrientation) {
+    // Rotates the connection's output clockwise by `angle` degrees (0, 90,
+    // 180 or 270).
+    func apply(rotationAngle angle: CGFloat) {
         if #available(iOS 17.0, *) {
-            let angle: CGFloat
-            switch interfaceOrientation {
-            case .portraitUpsideDown: angle = 270
-            case .landscapeLeft: angle = 180
-            case .landscapeRight: angle = 0
-            default: angle = 90
-            }
             if isVideoRotationAngleSupported(angle) {
                 videoRotationAngle = angle
             }
-        } else if isVideoOrientationSupported,
-                  let video = AVCaptureVideoOrientation(rawValue: interfaceOrientation.rawValue) {
-            videoOrientation = video
+        } else if isVideoOrientationSupported {
+            switch angle {
+            case 0: videoOrientation = .landscapeRight
+            case 180: videoOrientation = .landscapeLeft
+            case 270: videoOrientation = .portraitUpsideDown
+            default: videoOrientation = .portrait
+            }
+        }
+    }
+}
+
+extension CGImagePropertyOrientation {
+    // The orientation of a buffer that needs `angle` degrees of clockwise
+    // rotation to display upright. Front-camera mirroring is ignored: a
+    // mirrored face is still a face to the detector.
+    init(clockwiseRotation angle: CGFloat) {
+        switch angle {
+        case 90: self = .right
+        case 180: self = .down
+        case 270: self = .left
+        default: self = .up
         }
     }
 }
@@ -489,9 +596,11 @@ extension FaceCheck: AVCaptureVideoDataOutputSampleBufferDelegate {
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
         // A Mac's camera delivers upright landscape frames regardless of
         // window arrangement; on iPhone and iPad the rotation follows the
-        // interface orientation.
+        // device.
         let orientation: CGImagePropertyOrientation =
-            ProcessInfo.processInfo.isiOSAppOnMac ? .upMirrored : exifOrientation
+            ProcessInfo.processInfo.isiOSAppOnMac
+            ? .upMirrored
+            : legacyExif ?? CGImagePropertyOrientation(clockwiseRotation: captureAngle)
         detect2D(in: pixelBuffer, orientation: orientation)
     }
 }
