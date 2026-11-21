@@ -36,6 +36,9 @@ struct TimeLimitsView: View {
             }
         }
         .navigationTitle("Time limits")
+        .toolbar {
+            if !rules.isEmpty { EditButton() }
+        }
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { rules = SharedStore.shared.timeLimitRules }
         .queuedChangeAlert($queued)
@@ -59,58 +62,63 @@ struct TimeLimitsView: View {
 }
 
 struct TimeLimitEditView: View {
-    @Environment(\.dismiss) private var dismiss
-    @State var rule: TimeLimitRule
+    @State private var rule: TimeLimitRule
+    @State private var editing: Bool
+    private let original: TimeLimitRule
     let isNew: Bool
     let onSave: (TimeLimitRule) -> Void
+
+    init(rule: TimeLimitRule, isNew: Bool, onSave: @escaping (TimeLimitRule) -> Void) {
+        _rule = State(initialValue: rule)
+        _editing = State(initialValue: isNew)
+        original = rule
+        self.isNew = isNew
+        self.onSave = onSave
+    }
 
     var body: some View {
         List {
             // The rule is local until Save, so commit needs no extra work.
             SelectionEditor(
                 selection: $rule.selection,
-                footer: "Swipe an item left to remove it."
+                footer: "Swipe an item left to remove it.",
+                editable: editing
             ) { _ in }
 
             Section {
-                Picker("Per", selection: $rule.period) {
-                    Text("Hour").tag(TimeLimitRule.Period.hour)
-                    Text("Day").tag(TimeLimitRule.Period.day)
+                if editing {
+                    Picker("Per", selection: $rule.period) {
+                        Text("Hour").tag(TimeLimitRule.Period.hour)
+                        Text("Day").tag(TimeLimitRule.Period.day)
+                    }
+                    NumberField(
+                        title: "Allowed",
+                        value: $rule.minutes,
+                        range: 1...rule.period.maxMinutes,
+                        units: rule.period == .hour ? [.minutes] : [.minutes, .hours]
+                    )
+                    NumberField(
+                        title: "Warn when left",
+                        value: $rule.warnMinutes,
+                        range: 0...max(0, rule.minutes - 1)
+                    )
+                } else {
+                    ValueRow(title: "Per", value: rule.period == .hour ? "Hour" : "Day")
+                    ValueRow(title: "Allowed", value: hoursOrMinutesLabel(rule.minutes))
+                    ValueRow(title: "Warn when left", value: durationOrOffLabel(rule.warnMinutes))
                 }
-                NumberField(
-                    title: "Allowed",
-                    value: $rule.minutes,
-                    range: 1...rule.period.maxMinutes,
-                    units: rule.period == .hour ? [.minutes] : [.minutes, .hours]
-                )
-                NumberField(
-                    title: "Warn when left",
-                    value: $rule.warnMinutes,
-                    range: 0...max(0, rule.minutes - 1)
-                )
             } footer: {
                 Text("Budgets reset on the clock, at the top of each hour or at midnight. The warning notifies you when that many minutes are left; set it to 0 to turn it off.")
             }
         }
-        .numberPadDoneButton()
-        .navigationTitle(isNew ? "New limit" : "Edit limit")
+        .navigationTitle(isNew ? "New limit" : "Time limit")
         .navigationBarTitleDisplayMode(.inline)
-        // Leaving is an explicit choice: Save or Cancel, no back button, so
-        // edits can't be silently dropped.
-        .navigationBarBackButtonHidden(true)
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("Cancel") { dismiss() }
-            }
-            ToolbarItem(placement: .confirmationAction) {
-                Button("Save") {
-                    onSave(rule)
-                    dismiss()
-                }
-                .bold()
-                .tint(.blue)
-                .disabled(rule.itemCount == 0)
-            }
-        }
+        .ruleEditorChrome(
+            editing: $editing,
+            isNew: isNew,
+            canSave: rule.itemCount > 0,
+            revert: { rule = original },
+            save: { onSave(rule) }
+        )
     }
 }

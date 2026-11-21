@@ -179,7 +179,7 @@ struct HomeView: View {
                 HStack {
                     Label("Anti-tamper", systemImage: "lock.shield")
                     Spacer()
-                    Text(delayHoursLabel(SharedStore.shared.delayMinutes))
+                    Text(durationOrOffLabel(SharedStore.shared.delayMinutes))
                         .foregroundStyle(.secondary)
                 }
             }

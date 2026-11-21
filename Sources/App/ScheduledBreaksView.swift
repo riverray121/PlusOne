@@ -36,6 +36,9 @@ struct ScheduledBreaksView: View {
             }
         }
         .navigationTitle("Scheduled breaks")
+        .toolbar {
+            if !rules.isEmpty { EditButton() }
+        }
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { rules = SharedStore.shared.breakRules }
         .queuedChangeAlert($queued)
@@ -58,10 +61,19 @@ struct ScheduledBreaksView: View {
 }
 
 struct BreakEditView: View {
-    @Environment(\.dismiss) private var dismiss
-    @State var rule: BreakRule
+    @State private var rule: BreakRule
+    @State private var editing: Bool
+    private let original: BreakRule
     let isNew: Bool
     let onSave: (BreakRule) -> Void
+
+    init(rule: BreakRule, isNew: Bool, onSave: @escaping (BreakRule) -> Void) {
+        _rule = State(initialValue: rule)
+        _editing = State(initialValue: isNew)
+        original = rule
+        self.isNew = isNew
+        self.onSave = onSave
+    }
 
     // The rule stores a minute-of-day; the picker wants a Date. Only the
     // hour and minute survive the round trip.
@@ -87,46 +99,42 @@ struct BreakEditView: View {
             // The rule is local until Save, so commit needs no extra work.
             SelectionEditor(
                 selection: $rule.selection,
-                footer: "Swipe an item left to remove it."
+                footer: "Swipe an item left to remove it.",
+                editable: editing
             ) { _ in }
 
             Section {
-                DatePicker("Starts at", selection: startTime, displayedComponents: .hourAndMinute)
-                NumberField(
-                    title: "Window",
-                    value: $rule.windowMinutes,
-                    range: SettingLimits.minScheduleMinutes...SettingLimits.maxWindowMinutes,
-                    units: [.minutes, .hours]
-                )
-                NumberField(
-                    title: "Minutes of use",
-                    value: $rule.minutes,
-                    range: 1...rule.windowMinutes,
-                    units: [.minutes, .hours]
-                )
+                if editing {
+                    DatePicker("Starts at", selection: startTime, displayedComponents: .hourAndMinute)
+                    NumberField(
+                        title: "Window",
+                        value: $rule.windowMinutes,
+                        range: SettingLimits.minScheduleMinutes...SettingLimits.maxWindowMinutes,
+                        units: [.minutes, .hours]
+                    )
+                    NumberField(
+                        title: "Minutes of use",
+                        value: $rule.minutes,
+                        range: 1...rule.windowMinutes,
+                        units: [.minutes, .hours]
+                    )
+                } else {
+                    ValueRow(title: "Starts at", value: rule.timeLabel)
+                    ValueRow(title: "Window", value: hoursOrMinutesLabel(rule.windowMinutes))
+                    ValueRow(title: "Minutes of use", value: hoursOrMinutesLabel(rule.minutes))
+                }
             } footer: {
                 Text("The minutes are a budget you can spend at any point during the window. Blocking comes back once the minutes are used up or the window ends. Screen Time needs a window of at least 15 minutes and less than a full day.")
             }
         }
-        .numberPadDoneButton()
-        .navigationTitle(isNew ? "New break" : "Edit break")
+        .navigationTitle(isNew ? "New break" : "Break")
         .navigationBarTitleDisplayMode(.inline)
-        // Leaving is an explicit choice: Save or Cancel, no back button, so
-        // edits can't be silently dropped.
-        .navigationBarBackButtonHidden(true)
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("Cancel") { dismiss() }
-            }
-            ToolbarItem(placement: .confirmationAction) {
-                Button("Save") {
-                    onSave(rule)
-                    dismiss()
-                }
-                .bold()
-                .tint(.blue)
-                .disabled(rule.itemCount == 0)
-            }
-        }
+        .ruleEditorChrome(
+            editing: $editing,
+            isNew: isNew,
+            canSave: rule.itemCount > 0,
+            revert: { rule = original },
+            save: { onSave(rule) }
+        )
     }
 }

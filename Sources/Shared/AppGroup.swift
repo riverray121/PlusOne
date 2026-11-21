@@ -62,8 +62,8 @@ func hoursOrMinutesLabel(_ minutes: Int) -> String {
     return hours == 1 ? "1 hour" : "\(hours) hours"
 }
 
-// "Off", or the delay as hoursOrMinutesLabel spells it.
-func delayHoursLabel(_ minutes: Int) -> String {
+// "Off" for 0, otherwise the duration as hoursOrMinutesLabel spells it.
+func durationOrOffLabel(_ minutes: Int) -> String {
     minutes > 0 ? hoursOrMinutesLabel(minutes) : "Off"
 }
 

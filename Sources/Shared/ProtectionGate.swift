@@ -313,7 +313,7 @@ struct ProtectionGate {
         case .setDelay(let minutes):
             return minutes == 0
                 ? "Turn settings change delay off"
-                : "Settings change delay to \(delayHoursLabel(minutes))"
+                : "Settings change delay to \(durationOrOffLabel(minutes))"
         case .setDeletePrevention:
             return "Turn delete prevention off"
         case .unpairFriend:

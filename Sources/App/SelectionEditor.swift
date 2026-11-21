@@ -23,12 +23,30 @@ struct SelectionEditor: View {
     // token-only selection. Return false to keep the selection unchanged
     // (the removal was queued elsewhere). nil = removals always apply.
     var removal: ((FamilyActivitySelection) -> Bool)? = nil
+    // Read-only shows the chosen items with no add button or removal.
+    var editable = true
     let commit: (FamilyActivitySelection) -> Void
 
     @State private var showPicker = false
     @State private var pickerBuffer = FamilyActivitySelection()
 
     var body: some View {
+        if editable {
+            addSection
+        }
+
+        if !selection.applicationTokens.isEmpty {
+            appsSection
+        }
+        if !selection.webDomainTokens.isEmpty {
+            websitesSection
+        }
+        if !selection.categoryTokens.isEmpty {
+            categoriesSection
+        }
+    }
+
+    private var addSection: some View {
         Section {
             Button {
                 pickerBuffer = selection
@@ -52,16 +70,6 @@ struct SelectionEditor: View {
         } footer: {
             Text(footer)
         }
-
-        if !selection.applicationTokens.isEmpty {
-            appsSection
-        }
-        if !selection.webDomainTokens.isEmpty {
-            websitesSection
-        }
-        if !selection.categoryTokens.isEmpty {
-            categoriesSection
-        }
     }
 
     // Removal rides swipeActions rather than ForEach.onDelete: the per-row
@@ -72,8 +80,10 @@ struct SelectionEditor: View {
             ForEach(Array(selection.applicationTokens), id: \.self) { token in
                 Label(token)
                     .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                        Button("Remove", role: .destructive) {
-                            removeTokens(apps: [token])
+                        if editable {
+                            Button("Remove", role: .destructive) {
+                                removeTokens(apps: [token])
+                            }
                         }
                     }
             }
@@ -85,8 +95,10 @@ struct SelectionEditor: View {
             ForEach(Array(selection.webDomainTokens), id: \.self) { token in
                 Label(token)
                     .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                        Button("Remove", role: .destructive) {
-                            removeTokens(domains: [token])
+                        if editable {
+                            Button("Remove", role: .destructive) {
+                                removeTokens(domains: [token])
+                            }
                         }
                     }
             }
@@ -98,8 +110,10 @@ struct SelectionEditor: View {
             ForEach(Array(selection.categoryTokens), id: \.self) { token in
                 Label(token)
                     .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                        Button("Remove", role: .destructive) {
-                            removeTokens(categories: [token])
+                        if editable {
+                            Button("Remove", role: .destructive) {
+                                removeTokens(categories: [token])
+                            }
                         }
                     }
             }

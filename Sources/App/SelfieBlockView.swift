@@ -56,6 +56,9 @@ struct SelfieBlockView: View {
             }
         }
         .navigationTitle("Selfie-unlock blocks")
+        .toolbar {
+            if !rules.isEmpty { EditButton() }
+        }
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { rules = SharedStore.shared.selfieRules }
         .queuedChangeAlert($queued)
@@ -78,66 +81,72 @@ struct SelfieBlockView: View {
 }
 
 struct SelfieRuleEditView: View {
-    @Environment(\.dismiss) private var dismiss
-    @State var rule: SelfieRule
+    @State private var rule: SelfieRule
+    @State private var editing: Bool
+    private let original: SelfieRule
     let isNew: Bool
     let onSave: (SelfieRule) -> Void
+
+    init(rule: SelfieRule, isNew: Bool, onSave: @escaping (SelfieRule) -> Void) {
+        _rule = State(initialValue: rule)
+        _editing = State(initialValue: isNew)
+        original = rule
+        self.isNew = isNew
+        self.onSave = onSave
+    }
 
     var body: some View {
         List {
             // The rule is local until Save, so commit needs no extra work.
             SelectionEditor(
                 selection: $rule.selection,
-                footer: "Swipe an item left to remove it."
+                footer: "Swipe an item left to remove it.",
+                editable: editing
             ) { _ in }
 
             Section {
-                NumberField(
-                    title: "Unlock duration",
-                    value: $rule.durationMinutes,
-                    range: 1...SettingLimits.maxDayMinutes,
-                    units: [.minutes, .hours]
-                )
-                NumberField(
-                    title: "Cooldown",
-                    value: $rule.cooldownMinutes,
-                    range: 0...SettingLimits.maxWaitMinutes,
-                    units: [.minutes, .hours, .days]
-                )
-                NumberField(
-                    title: "Daily cap",
-                    value: $rule.dailyCap,
-                    range: 0...SettingLimits.maxCount,
-                    units: [.init(label: "sessions", factor: 1)]
-                )
-                NumberField(
-                    title: "Warn when left",
-                    value: $rule.warnMinutes,
-                    range: 0...max(0, rule.durationMinutes - 1)
-                )
+                if editing {
+                    NumberField(
+                        title: "Unlock duration",
+                        value: $rule.durationMinutes,
+                        range: 1...SettingLimits.maxDayMinutes,
+                        units: [.minutes, .hours]
+                    )
+                    NumberField(
+                        title: "Cooldown",
+                        value: $rule.cooldownMinutes,
+                        range: 0...SettingLimits.maxWaitMinutes,
+                        units: [.minutes, .hours, .days]
+                    )
+                    NumberField(
+                        title: "Daily cap",
+                        value: $rule.dailyCap,
+                        range: 0...SettingLimits.maxCount,
+                        units: [.init(label: "sessions", factor: 1)]
+                    )
+                    NumberField(
+                        title: "Warn when left",
+                        value: $rule.warnMinutes,
+                        range: 0...max(0, rule.durationMinutes - 1)
+                    )
+                } else {
+                    ValueRow(title: "Unlock duration", value: hoursOrMinutesLabel(rule.durationMinutes))
+                    ValueRow(title: "Cooldown", value: durationOrOffLabel(rule.cooldownMinutes))
+                    ValueRow(title: "Daily cap", value: rule.dailyCap == 0 ? "Off" : "\(rule.dailyCap) sessions")
+                    ValueRow(title: "Warn when left", value: durationOrOffLabel(rule.warnMinutes))
+                }
             } footer: {
                 Text("Each selfie pass unlocks the tapped item for the duration. Cooldown is the wait between unlocks, and the daily cap limits how many you get per day. The warning notifies you when that many minutes are left in a session. Set cooldown, cap or warning to 0 to turn it off.")
             }
         }
-        .numberPadDoneButton()
-        .navigationTitle(isNew ? "New block" : "Edit block")
+        .navigationTitle(isNew ? "New block" : "Selfie block")
         .navigationBarTitleDisplayMode(.inline)
-        // Leaving is an explicit choice: Save or Cancel, no back button, so
-        // edits can't be silently dropped.
-        .navigationBarBackButtonHidden(true)
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("Cancel") { dismiss() }
-            }
-            ToolbarItem(placement: .confirmationAction) {
-                Button("Save") {
-                    onSave(rule)
-                    dismiss()
-                }
-                .bold()
-                .tint(.blue)
-                .disabled(rule.itemCount == 0)
-            }
-        }
+        .ruleEditorChrome(
+            editing: $editing,
+            isNew: isNew,
+            canSave: rule.itemCount > 0,
+            revert: { rule = original },
+            save: { onSave(rule) }
+        )
     }
 }
