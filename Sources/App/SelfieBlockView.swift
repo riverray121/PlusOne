@@ -83,10 +83,6 @@ struct SelfieRuleEditView: View {
     let isNew: Bool
     let onSave: (SelfieRule) -> Void
 
-    private let durationOptions = [1, 2, 3, 5, 10, 15, 20, 30, 45, 60]
-    private let cooldownOptions = [0, 5, 15, 30, 60, 120]
-    private let capOptions = Array(0...10)
-
     var body: some View {
         List {
             // The rule is local until Save, so commit needs no extra work.
@@ -96,28 +92,34 @@ struct SelfieRuleEditView: View {
             ) { _ in }
 
             Section {
-                Picker("Unlock duration", selection: $rule.durationMinutes) {
-                    ForEach(durationOptions, id: \.self) { Text("\($0) min") }
-                }
-                Picker("Cooldown", selection: $rule.cooldownMinutes) {
-                    ForEach(cooldownOptions, id: \.self) {
-                        Text($0 == 0 ? "Off" : "\($0) min")
-                    }
-                }
-                Picker("Daily cap", selection: $rule.dailyCap) {
-                    ForEach(capOptions, id: \.self) {
-                        Text($0 == 0 ? "Off" : "\($0) sessions")
-                    }
-                }
-                Picker("Warn when minutes left", selection: $rule.warnMinutes) {
-                    ForEach(warnMinuteOptions, id: \.self) {
-                        Text($0 == 0 ? "Off" : "\($0) min")
-                    }
-                }
+                NumberField(
+                    title: "Unlock duration",
+                    value: $rule.durationMinutes,
+                    range: 1...SettingLimits.maxDayMinutes,
+                    units: [.minutes, .hours]
+                )
+                NumberField(
+                    title: "Cooldown",
+                    value: $rule.cooldownMinutes,
+                    range: 0...SettingLimits.maxWaitMinutes,
+                    units: [.minutes, .hours, .days]
+                )
+                NumberField(
+                    title: "Daily cap",
+                    value: $rule.dailyCap,
+                    range: 0...SettingLimits.maxCount,
+                    units: [.init(label: "sessions", factor: 1)]
+                )
+                NumberField(
+                    title: "Warn when left",
+                    value: $rule.warnMinutes,
+                    range: 0...max(0, rule.durationMinutes - 1)
+                )
             } footer: {
-                Text("Each selfie pass unlocks the tapped item for the duration. Cooldown is the wait between unlocks, and the daily cap limits how many you get per day. The warning notifies you when that many minutes are left in a session.")
+                Text("Each selfie pass unlocks the tapped item for the duration. Cooldown is the wait between unlocks, and the daily cap limits how many you get per day. The warning notifies you when that many minutes are left in a session. Set cooldown, cap or warning to 0 to turn it off.")
             }
         }
+        .numberPadDoneButton()
         .navigationTitle(isNew ? "New block" : "Edit block")
         .navigationBarTitleDisplayMode(.inline)
         // Leaving is an explicit choice: Save or Cancel, no back button, so

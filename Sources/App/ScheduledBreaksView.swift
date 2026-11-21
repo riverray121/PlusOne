@@ -63,12 +63,6 @@ struct BreakEditView: View {
     let isNew: Bool
     let onSave: (BreakRule) -> Void
 
-    private let windowOptions = [15, 30, 45, 60, 90, 120, 180, 240]
-
-    private var minuteOptions: [Int] {
-        [5, 10, 15, 20, 30, 45, 60, 90, 120].filter { $0 <= rule.windowMinutes }
-    }
-
     // The rule stores a minute-of-day; the picker wants a Date. Only the
     // hour and minute survive the round trip.
     private var startTime: Binding<Date> {
@@ -98,19 +92,23 @@ struct BreakEditView: View {
 
             Section {
                 DatePicker("Starts at", selection: startTime, displayedComponents: .hourAndMinute)
-                Picker("Window", selection: $rule.windowMinutes) {
-                    ForEach(windowOptions, id: \.self) { Text(hoursOrMinutesLabel($0)) }
-                }
-                .onChange(of: rule.windowMinutes) { window in
-                    if rule.minutes > window { rule.minutes = window }
-                }
-                Picker("Minutes of use", selection: $rule.minutes) {
-                    ForEach(minuteOptions, id: \.self) { Text("\($0) min") }
-                }
+                NumberField(
+                    title: "Window",
+                    value: $rule.windowMinutes,
+                    range: SettingLimits.minScheduleMinutes...SettingLimits.maxWindowMinutes,
+                    units: [.minutes, .hours]
+                )
+                NumberField(
+                    title: "Minutes of use",
+                    value: $rule.minutes,
+                    range: 1...rule.windowMinutes,
+                    units: [.minutes, .hours]
+                )
             } footer: {
-                Text("The minutes are a budget you can spend at any point during the window. Blocking comes back once the minutes are used up or the window ends.")
+                Text("The minutes are a budget you can spend at any point during the window. Blocking comes back once the minutes are used up or the window ends. Screen Time needs a window of at least 15 minutes and less than a full day.")
             }
         }
+        .numberPadDoneButton()
         .navigationTitle(isNew ? "New break" : "Edit break")
         .navigationBarTitleDisplayMode(.inline)
         // Leaving is an explicit choice: Save or Cancel, no back button, so

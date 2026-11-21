@@ -30,7 +30,8 @@ friend approval of weakening changes via CloudKit.
 ## Feature 2: Settings change delay
 
 ### How it works
-- One delay duration, chosen in settings, options roughly 1 hour to 72 hours.
+- One delay duration, typed in settings in minutes, hours or days; 0 turns
+  it off.
 - Weakenings covered: removing an app or website from the blocked list,
   lengthening unlock duration, disabling cooldown or daily cap, turning off
   delete prevention, unpairing a friend (feature 3), and shortening the delay

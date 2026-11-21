@@ -8,8 +8,8 @@ time, and duration.
 
 ## How it works
 - A break has four parts: the apps and websites it opens, a daily start
-  time, a window length (15 minutes to 4 hours), and a budget of minutes
-  usable within that window.
+  time, a typed window length (at least 15 minutes, under 24 hours), and a
+  typed budget of minutes usable within that window.
 - At the start time the break's items unshield and a notification announces
   the break. The budget counts actual use and can be spent any time within
   the window. When the budget is spent or the window closes, blocking

@@ -12,6 +12,12 @@ struct TimeLimitRule: Codable, Identifiable, Equatable {
         var label: String {
             self == .hour ? "hour" : "day"
         }
+
+        // Longest budget the period's schedule can count: the hourly window
+        // runs :00 to :59 and the daily one 0:00 to 23:59.
+        var maxMinutes: Int {
+            self == .hour ? 59 : 24 * 60 - 1
+        }
     }
 
     var id = UUID()

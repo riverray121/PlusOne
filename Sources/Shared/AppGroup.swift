@@ -35,22 +35,36 @@ func pluralItems(_ n: Int) -> String {
     n == 1 ? "1 item" : "\(n) items"
 }
 
-// Minutes-remaining choices for the session and time-limit warning pickers,
-// shared so the two warnings always offer the same marks. 0 = off.
-let warnMinuteOptions = [0, 1, 2, 5, 10]
+// Bounds for typed settings. Only the schedule bounds come from Screen Time;
+// the rest keep a value inside what its unit means.
+enum SettingLimits {
+    // DeviceActivity rejects schedules shorter than this.
+    static let minScheduleMinutes = 15
+    // A repeating break schedule needs distinct start and end times, so a
+    // window stops short of a full day.
+    static let maxWindowMinutes = 24 * 60 - 1
+    // Usage granted or counted within one day.
+    static let maxDayMinutes = 24 * 60
+    // Cooldown and change delay.
+    static let maxWaitMinutes = 365 * 24 * 60
+    static let maxCount = 999
+}
 
-// "45 min" / "1 hour" / "2 hours"
+// "45 min" / "90 min" / "2 hours" / "3 days", in the largest unit that
+// divides evenly.
 func hoursOrMinutesLabel(_ minutes: Int) -> String {
-    guard minutes % 60 == 0 else { return "\(minutes) min" }
+    if minutes > 0, minutes % (24 * 60) == 0 {
+        let days = minutes / (24 * 60)
+        return days == 1 ? "1 day" : "\(days) days"
+    }
+    guard minutes > 0, minutes % 60 == 0 else { return "\(minutes) min" }
     let hours = minutes / 60
     return hours == 1 ? "1 hour" : "\(hours) hours"
 }
 
-// "Off" / "1 hour" / "12 hours"
+// "Off", or the delay as hoursOrMinutesLabel spells it.
 func delayHoursLabel(_ minutes: Int) -> String {
-    guard minutes > 0 else { return "Off" }
-    let hours = minutes / 60
-    return hours == 1 ? "1 hour" : "\(hours) hours"
+    minutes > 0 ? hoursOrMinutesLabel(minutes) : "Off"
 }
 
 extension FamilyActivitySelection {

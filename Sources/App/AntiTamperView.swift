@@ -9,8 +9,6 @@ struct AntiTamperView: View {
     @State private var queued: QueuedNotice?
     @State private var sharePresentation: SharePresentation?
 
-    private let delayOptions = [0, 60, 360, 720, 1440, 2880, 4320]
-
     var body: some View {
         List {
             Section {
@@ -25,11 +23,16 @@ struct AntiTamperView: View {
             }
 
             Section {
-                Picker("Settings change delay", selection: $delay) {
-                    ForEach(delayOptions, id: \.self) { Text(delayHoursLabel($0)) }
-                }
-                .onChange(of: delay) { minutes in
-                    if !proposeOrNotify(.setDelay(minutes), into: $queued) {
+                // Proposed only when an edit is finished: every keystroke
+                // would otherwise queue its own pending change.
+                NumberField(
+                    title: "Change delay",
+                    value: $delay,
+                    range: 0...SettingLimits.maxWaitMinutes,
+                    units: [.minutes, .hours, .days]
+                ) {
+                    guard delay != SharedStore.shared.delayMinutes else { return }
+                    if !proposeOrNotify(.setDelay(delay), into: $queued) {
                         delay = SharedStore.shared.delayMinutes
                     }
                 }
@@ -47,12 +50,13 @@ struct AntiTamperView: View {
                     }
                 }
             } footer: {
-                Text("Any change that loosens your protection has to wait this long before it takes effect. While it waits you can cancel it. Changes that tighten protection happen right away.")
+                Text("Any change that loosens your protection has to wait this long before it takes effect. While it waits you can cancel it. Changes that tighten protection happen right away. Set it to 0 to turn the delay off.")
             }
 
             FriendPairingSection(queued: $queued, sharePresentation: $sharePresentation)
             FriendInboxSection()
         }
+        .numberPadDoneButton()
         .navigationTitle("Anti-tamper")
         .navigationBarTitleDisplayMode(.inline)
         .sheet(item: $sharePresentation) { presentation in

@@ -64,10 +64,6 @@ struct TimeLimitEditView: View {
     let isNew: Bool
     let onSave: (TimeLimitRule) -> Void
 
-    private var minuteOptions: [Int] {
-        let all = [1, 2, 3, 5, 10, 15, 20, 30, 45, 60, 90, 120]
-        return rule.period == .hour ? all.filter { $0 < 60 } : all
-    }
     var body: some View {
         List {
             // The rule is local until Save, so commit needs no extra work.
@@ -77,25 +73,26 @@ struct TimeLimitEditView: View {
             ) { _ in }
 
             Section {
-                Picker("Minutes", selection: $rule.minutes) {
-                    ForEach(minuteOptions, id: \.self) { Text("\($0) min") }
-                }
                 Picker("Per", selection: $rule.period) {
                     Text("Hour").tag(TimeLimitRule.Period.hour)
                     Text("Day").tag(TimeLimitRule.Period.day)
                 }
-                .onChange(of: rule.period) { period in
-                    if period == .hour && rule.minutes >= 60 { rule.minutes = 30 }
-                }
-                Picker("Warn when minutes left", selection: $rule.warnMinutes) {
-                    ForEach(warnMinuteOptions, id: \.self) {
-                        Text($0 == 0 ? "Off" : "\($0) min")
-                    }
-                }
+                NumberField(
+                    title: "Allowed",
+                    value: $rule.minutes,
+                    range: 1...rule.period.maxMinutes,
+                    units: rule.period == .hour ? [.minutes] : [.minutes, .hours]
+                )
+                NumberField(
+                    title: "Warn when left",
+                    value: $rule.warnMinutes,
+                    range: 0...max(0, rule.minutes - 1)
+                )
             } footer: {
-                Text("Budgets reset on the clock, at the top of each hour or at midnight. The warning notifies you when that many minutes are left.")
+                Text("Budgets reset on the clock, at the top of each hour or at midnight. The warning notifies you when that many minutes are left; set it to 0 to turn it off.")
             }
         }
+        .numberPadDoneButton()
         .navigationTitle(isNew ? "New limit" : "Edit limit")
         .navigationBarTitleDisplayMode(.inline)
         // Leaving is an explicit choice: Save or Cancel, no back button, so
