@@ -60,11 +60,13 @@ struct ShieldController {
         // regardless of any other block, hard blocks and spent limits
         // included.
         for rule in BreakManager.shared.activeRules {
+            let breakDomains = rule.selection.webDomainTokens
+                .union(companionDomains(of: rule.selection.applicationTokens))
             apps.subtract(rule.selection.applicationTokens)
-            domains.subtract(rule.selection.webDomainTokens)
+            domains.subtract(breakDomains)
             categories.subtract(rule.selection.categoryTokens)
             exceptApps.formUnion(rule.selection.applicationTokens)
-            exceptDomains.formUnion(rule.selection.webDomainTokens)
+            exceptDomains.formUnion(breakDomains)
         }
 
         store.shield.applications = apps.isEmpty ? nil : apps
@@ -81,6 +83,20 @@ struct ShieldController {
         store.webContent.blockedByFilter = SharedStore.shared.adultFilterEnabled
             ? .auto([], except: [])
             : WebContentSettings.FilterPolicy.none
+    }
+
+    // Web domains that share a selfie rule with any of `apps`. iOS shields
+    // an app whose own domain is shielded (the X app under x.com) with the
+    // system "Restricted" screen, so opening the app alone leaves it
+    // blocked. Tokens are opaque and cannot be matched to apps directly; a
+    // shared rule is the link the user drew between them.
+    private func companionDomains(of apps: Set<ApplicationToken>) -> Set<WebDomainToken> {
+        guard !apps.isEmpty else { return [] }
+        return Set(
+            SharedStore.shared.selfieRules
+                .filter { !$0.selection.applicationTokens.isDisjoint(with: apps) }
+                .flatMap(\.selection.webDomainTokens)
+        )
     }
 
     // The OS app-removal restriction, device-wide by design. Independent of
