@@ -36,9 +36,6 @@ struct TimeLimitsView: View {
             }
         }
         .navigationTitle("Time limits")
-        .toolbar {
-            if !rules.isEmpty { EditButton() }
-        }
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { rules = SharedStore.shared.timeLimitRules }
         .queuedChangeAlert($queued)

@@ -56,9 +56,6 @@ struct SelfieBlockView: View {
             }
         }
         .navigationTitle("Selfie-unlock blocks")
-        .toolbar {
-            if !rules.isEmpty { EditButton() }
-        }
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { rules = SharedStore.shared.selfieRules }
         .queuedChangeAlert($queued)

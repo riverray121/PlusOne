@@ -36,9 +36,6 @@ struct ScheduledBreaksView: View {
             }
         }
         .navigationTitle("Scheduled breaks")
-        .toolbar {
-            if !rules.isEmpty { EditButton() }
-        }
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { rules = SharedStore.shared.breakRules }
         .queuedChangeAlert($queued)
